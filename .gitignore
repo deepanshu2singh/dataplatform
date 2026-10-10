@@ -1,0 +1,75 @@
+# Environment / secrets
+.env
+*.env
+!.env.example
+backend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime data
+backend/uploads/
+uploads/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# CLOUD DEPLOYMENT EXCLUSIONS
+
+# Secrets / local configuration
+.env
+**/.env
+production.env
+**/production.env
+*.pem
+*.key
+*.crt
+
+# Keep safe example configuration files
+!.env.example
+!**/.env.example
+
+# Runtime data
+backend/uploads/
+.phase8f6/
+
+# Historical / local release artifacts
+checkpoints/
+archive/
+backups/
+
+# Frontend generated content
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Python generated content
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Vercel local state
+.vercel/
+**/.vercel/
+
+# Database backups
+*.dump
+
+# OS/editor junk
+.DS_Store
+Thumbs.db

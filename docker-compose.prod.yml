@@ -1,0 +1,159 @@
+name: dataplatform-prod
+
+x-backend-environment: &backend-environment
+  ENVIRONMENT: production
+  DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/databricks_clone
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+  FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+  AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+  AUTH_COOKIE_SECURE: "true"
+  AUTH_COOKIE_PATH: /api/v1
+  UPLOAD_DIR: /app/uploads
+  MAX_UPLOAD_SIZE: "104857600"
+  SQL_ECHO: "false"
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  postgres:
+    cpus: ${POSTGRES_CPUS:-1.0}
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-512m}
+    pids_limit: ${POSTGRES_PIDS_LIMIT:-128}
+    image: postgres:15-alpine
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,mode=3775
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: databricks_clone
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d databricks_clone"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  migrate:
+    cpus: ${MIGRATE_CPUS:-1.0}
+    mem_limit: ${MIGRATE_MEMORY_LIMIT:-384m}
+    pids_limit: ${MIGRATE_PIDS_LIMIT:-64}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    image: dataplatform-backend-prod:8f4
+    environment: *backend-environment
+    command: ["alembic", "upgrade", "head"]
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    cpus: ${BACKEND_CPUS:-2.0}
+    mem_limit: ${BACKEND_MEMORY_LIMIT:-1536m}
+    pids_limit: ${BACKEND_PIDS_LIMIT:-128}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    image: dataplatform-backend-prod:8f4
+    environment: *backend-environment
+    volumes:
+      - uploads_data:/app/uploads
+    expose:
+      - "8000"
+    networks:
+      - edge
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 40s
+
+  frontend:
+    cpus: ${FRONTEND_CPUS:-0.5}
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-256m}
+    pids_limit: ${FRONTEND_PIDS_LIMIT:-64}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: /api/v1
+    image: dataplatform-frontend-prod:8f4
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:8080"
+    expose:
+      - "8080"
+    networks:
+      - edge
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  edge:
+    driver: bridge
+  data:
+    driver: bridge
+    internal: true

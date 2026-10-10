@@ -1,0 +1,4 @@
+app.example.test {
+    tls internal
+    reverse_proxy frontend:8080
+}

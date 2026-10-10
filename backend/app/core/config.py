@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     AUTH_COOKIE_SECURE: bool | None = None
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/databricks_clone"
+    DATABASE_USE_NULL_POOL: bool = False
     SQL_ECHO: bool = False
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 

@@ -5,7 +5,9 @@ import {
   createBrowserRouter,
   useRouteError,
 } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute, PublicRoute, VerificationRoute } from './components/AccountAccess';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { Layout } from './components/Layout';
 import { UnsavedChangesProvider } from './components/UnsavedChangesProvider';
 import { LoginPage } from './pages/LoginPage';
@@ -89,26 +91,6 @@ function RouteErrorPage() {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <FullPageLoading />;
-  }
-
-  return user ? <>{children}</> : <Navigate to="/login" />;
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <FullPageLoading />;
-  }
-
-  return user ? <Navigate to="/" /> : <>{children}</>;
-}
-
 function ProtectedLayout() {
   return (
     <ProtectedRoute>
@@ -120,6 +102,11 @@ function ProtectedLayout() {
 }
 
 const router = createBrowserRouter([
+  {
+    path: '/verify-email',
+    errorElement: <RouteErrorPage />,
+    element: <VerificationRoute><VerifyEmailPage /></VerificationRoute>,
+  },
   {
     path: '/login',
     errorElement: <RouteErrorPage />,

@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, setUnauthorizedHandler } from '../lib/api';
+import { api, setUnauthorizedHandler, setVerificationRequiredHandler } from '../lib/api';
 import { isCanceledRequest, useLatestRequest } from '../hooks/useLatestRequest';
 
 interface User {
@@ -15,6 +15,8 @@ interface User {
   full_name: string | null;
   is_active: boolean;
   is_superuser: boolean;
+  email_verified: boolean;
+  email_verification_required: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +25,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, full_name?: string) => Promise<void>;
   logout: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,10 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setUnauthorizedHandler(clearSession);
+    setVerificationRequiredHandler(() => {
+      setUser((current) => current ? { ...current, email_verified: false, email_verification_required: true } : null);
+    });
     void fetchUser();
 
     return () => {
       setUnauthorizedHandler(null);
+      setVerificationRequiredHandler(null);
     };
   }, [clearSession, fetchUser]);
 
@@ -109,8 +117,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   };
 
+  const verifyEmail = async (code: string) => {
+    const request = sessionRequest.begin();
+    try {
+      const response = await api.post('/auth/email-verification/confirm', { code }, { signal: request.signal });
+      if (request.isCurrent()) {
+        setUser(response.data);
+      }
+    } finally {
+      request.finish();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, verifyEmail, refreshUser: fetchUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,7 +12,7 @@ import pytest
 
 
 PREVIOUS_REVISION = "20261006_0002"
-HEAD_REVISION = "20261011_0005"
+HEAD_REVISION = "20261016_0006"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 OWNED_TABLES = ("datasets", "notebooks", "dashboards")
 REDUNDANT_PK_INDEXES = {

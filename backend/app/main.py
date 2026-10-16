@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,6 +36,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_response(request: Request, exc: RequestValidationError):
+    if request.url.path == f"{settings.API_V1_STR}/auth/email-verification/confirm":
+        # FastAPI's normal validation response can echo the submitted input.
+        # A malformed pasted code must not appear in response/error telemetry.
+        return JSONResponse(status_code=422, content={"detail": "Enter an eight-digit verification code"})
+    return await request_validation_exception_handler(request, exc)
+
 # Middleware ordering matters. Starlette executes the most recently added
 # user middleware first, so add them from innermost to outermost:
 # CSRF -> request observability/error boundary -> CORS.
@@ -60,7 +71,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[REQUEST_ID_HEADER],
+    expose_headers=[REQUEST_ID_HEADER, "X-Email-Verification-Required"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

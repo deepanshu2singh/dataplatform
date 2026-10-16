@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_enabled_user
 from app.core.config import settings
 from app.core.security import (
     clear_auth_cookie,
@@ -19,6 +19,8 @@ from app.core.security import (
 from app.db.session import get_db
 from app.models.user import User as UserModel
 from app.schemas.user import User as UserRead, UserCreate
+from app.schemas.email_verification import EmailVerificationCode, EmailVerificationDelivery
+from app.services.email_verification import confirm_email_code, request_email_code
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -148,6 +150,29 @@ async def logout(response: Response):
 
 @router.get("/me", response_model=UserRead)
 async def read_users_me(
-    current_user: UserModel = Depends(get_current_active_user),
+    response: Response,
+    current_user: UserModel = Depends(get_current_enabled_user),
 ):
+    response.headers["Cache-Control"] = "no-store"
     return current_user
+
+
+@router.post("/email-verification/send", response_model=EmailVerificationDelivery)
+async def send_email_verification(
+    response: Response,
+    current_user: UserModel = Depends(get_current_enabled_user),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await request_email_code(db, current_user.id)
+
+
+@router.post("/email-verification/confirm", response_model=UserRead)
+async def confirm_email_verification(
+    payload: EmailVerificationCode,
+    response: Response,
+    current_user: UserModel = Depends(get_current_enabled_user),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await confirm_email_code(db, current_user.id, payload.code)

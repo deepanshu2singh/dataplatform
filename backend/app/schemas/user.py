@@ -24,6 +24,8 @@ class UserInDBBase(UserBase):
     id: int
     is_active: bool
     is_superuser: bool
+    email_verified: bool
+    email_verification_required: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -97,6 +97,16 @@ def user_factory(api_client: httpx.Client):
         )
         assert register_response.status_code == 201, register_response.text
 
+        # These existing feature tests require a verified fixture account. Email
+        # verification itself is exercised independently with a mocked transport.
+        async def mark_fixture_verified():
+            connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
+            try:
+                await connection.execute("UPDATE users SET email_verified_at = now() WHERE id = $1", register_response.json()["id"])
+            finally:
+                await connection.close()
+        asyncio.run(mark_fixture_verified())
+
         login_response = api_client.post(
             "auth/login",
             headers={"Origin": FRONTEND_ORIGIN},

@@ -1,7 +1,7 @@
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -101,6 +101,11 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Enable only after the additive migration and real delivery preflight.
+    EMAIL_VERIFICATION_REQUIRED: bool = False
+    RESEND_API_KEY: SecretStr | None = None
+    EMAIL_FROM: EmailStr | None = None
+
     @property
     def effective_upload_max_bytes(self) -> int:
         if self.STORAGE_BACKEND == "supabase":
@@ -187,6 +192,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_security_configuration(self):
         secret_lower = self.SECRET_KEY.strip().lower()
+
+        if self.EMAIL_VERIFICATION_REQUIRED and (
+            self.RESEND_API_KEY is None
+            or not self.RESEND_API_KEY.get_secret_value().strip()
+            or self.EMAIL_FROM is None
+        ):
+            raise ValueError("Email verification requires RESEND_API_KEY and EMAIL_FROM")
 
         if self.ENVIRONMENT == "production":
             insecure_secret_markers = (

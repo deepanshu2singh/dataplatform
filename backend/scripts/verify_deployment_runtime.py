@@ -18,7 +18,7 @@ from app.services.sql_executor import SQLExecutor, SQLValidationError
 def main():
     if any(importlib.util.find_spec(name) is not None for name in ("pyarrow", "openpyxl", "xlrd")):
         raise RuntimeError("Rebuild the runtime image: removed dependencies are still installed.")
-    if EXPECTED_ALEMBIC_HEAD != "20261011_0005":
+    if EXPECTED_ALEMBIC_HEAD != "20261016_0006":
         raise RuntimeError("Deployment migration assets are incomplete.")
     original_upload_dir = settings.UPLOAD_DIR
     try:

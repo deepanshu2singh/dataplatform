@@ -11,6 +11,8 @@ const TEST_USER = {
   full_name: 'Test User',
   is_active: true,
   is_superuser: false,
+  email_verified: true,
+  email_verification_required: true,
 };
 
 function AuthProbe() {
@@ -21,6 +23,8 @@ function AuthProbe() {
     <div>
       <div data-testid="loading">{String(auth.loading)}</div>
       <div data-testid="user-email">{auth.user?.email ?? 'none'}</div>
+      <div data-testid="verified">{String(auth.user?.email_verified)}</div>
+      <button onClick={() => void auth.verifyEmail('00001234').catch((reason: unknown) => setError(String(reason)))}>Verify probe</button>
       <div data-testid="error">{error}</div>
       <button
         type="button"
@@ -217,4 +221,29 @@ describe('AuthProvider', () => {
 
     expect(postSpy).toHaveBeenCalledWith('/auth/logout');
   });
+  it('retains a restricted session and refreshes verification identity from the confirm response', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { ...TEST_USER, email_verified: false } });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: TEST_USER });
+    const user = userEvent.setup(); renderAuthProbe();
+    await waitFor(() => expect(screen.getByTestId('verified')).toHaveTextContent('false'));
+    await user.click(screen.getByRole('button', { name: 'Verify probe' }));
+    await waitFor(() => expect(screen.getByTestId('verified')).toHaveTextContent('true'));
+    expect(post).toHaveBeenCalledWith('/auth/email-verification/confirm', { code: '00001234' }, expect.objectContaining({ signal: expect.any(Object) }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('ignores a late verification response after logout', async () => {
+    let resolveVerification!: (value: { data: typeof TEST_USER }) => void;
+    const pending = new Promise<{ data: typeof TEST_USER }>((resolve) => { resolveVerification = resolve; });
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { ...TEST_USER, email_verified: false } });
+    vi.spyOn(api, 'post').mockImplementation((url) => url === '/auth/email-verification/confirm' ? pending as any : Promise.resolve({ data: undefined }) as any);
+    const user = userEvent.setup(); renderAuthProbe();
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('user@example.com'));
+    await user.click(screen.getByRole('button', { name: 'Verify probe' }));
+    await user.click(screen.getByRole('button', { name: 'Logout probe' }));
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+    resolveVerification({ data: TEST_USER });
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+  });
+
 });

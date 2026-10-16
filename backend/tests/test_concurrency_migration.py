@@ -12,7 +12,7 @@ import pytest
 
 
 PREVIOUS_REVISION = "20261006_0003"
-HEAD_REVISION = "20261011_0005"
+HEAD_REVISION = "20261016_0006"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 VERSIONED_TABLES = ("datasets", "notebooks", "dashboards")
 

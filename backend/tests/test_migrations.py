@@ -10,8 +10,8 @@ from uuid import uuid4
 import asyncpg
 import pytest
 
-APP_TABLES = {"users", "datasets", "notebooks", "dashboards", "dataset_uploads"}
-HEAD_REVISION = "20261011_0005"
+APP_TABLES = {"users", "datasets", "notebooks", "dashboards", "dataset_uploads", "email_delivery_limits"}
+HEAD_REVISION = "20261016_0006"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 

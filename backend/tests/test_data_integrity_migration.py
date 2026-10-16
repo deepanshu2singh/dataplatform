@@ -12,7 +12,7 @@ import pytest
 
 
 BASELINE_REVISION = "20261006_0001"
-HEAD_REVISION = "20261011_0005"
+HEAD_REVISION = "20261016_0006"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CHECKS = {
     "ck_users_email_normalized",

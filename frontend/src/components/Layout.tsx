@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard,
@@ -13,12 +13,15 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { ThemeControl } from './ThemeControl';
 import { getApiErrorMessage } from '../lib/apiError';
 import { useUnsavedChangesController } from '../hooks/useUnsavedChanges';
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pageTitle = pathname.startsWith('/notebooks') ? 'Notebooks' : pathname.startsWith('/datasets') ? 'Datasets' : pathname.startsWith('/dashboards') ? 'Dashboards' : pathname.startsWith('/settings') ? 'Settings' : 'Workspace';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const {
@@ -68,7 +71,7 @@ export function Layout() {
       <aside id="primary-navigation" className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">DataPlatform</h1>
+            <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white" aria-hidden="true">D</span><h1 className="text-lg font-semibold text-gray-900 dark:text-white">DataPlatform</h1></div>
             <button
               type="button"
               className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -92,7 +95,7 @@ export function Layout() {
                     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                     }`
                   }
                   onClick={() => setSidebarOpen(false)}
@@ -149,13 +152,14 @@ export function Layout() {
 
             <div className="flex-1 lg:flex-none">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white hidden sm:block">
-                DataPlatform
+                {pageTitle}
               </h2>
             </div>
+            <ThemeControl />
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 lg:p-8">
+        <main id="main-content" tabIndex={-1} className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
           {logoutError && (
             <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 
 import { api } from '../lib/api';
+import { AccessibleDialog } from '../components/AccessibleDialog';
+import { useTheme } from '../contexts/theme';
 import { getApiErrorMessage } from '../lib/apiError';
 import { isCanceledRequest, useLatestRequest } from '../hooks/useLatestRequest';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChanges';
@@ -794,8 +796,8 @@ export function NotebookPage() {
             onRemove={() => removeCell(cell.id)}
             onMoveUp={() => moveCell(cell.id, 'up')}
             onMoveDown={() => moveCell(cell.id, 'down')}
-            onAddAbove={() => insertCell(cell.id, 'above', 'sql')}
-            onAddBelow={() => insertCell(cell.id, 'below', 'sql')}
+            onAddAbove={(type) => insertCell(cell.id, 'above', type)}
+            onAddBelow={(type) => insertCell(cell.id, 'below', type)}
             onChangeType={(type) => changeCellType(cell.id, type)}
             onCopyOutput={() => {
               if (cell.output) {
@@ -853,8 +855,8 @@ interface CellComponentProps {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onAddAbove: () => void;
-  onAddBelow: () => void;
+  onAddAbove: (type: CellType) => void;
+  onAddBelow: (type: CellType) => void;
   onChangeType: (type: CellType) => void;
   onCopyOutput: () => void;
 }
@@ -875,13 +877,15 @@ function CellComponent({
   onChangeType,
   onCopyOutput,
 }: CellComponentProps) {
+  const { resolvedTheme } = useTheme();
+  const [insertion, setInsertion] = useState<'above' | 'below' | null>(null);
   const canRun =
     (cell.type === 'sql' || cell.type === 'python') &&
     selectedDatasetId !== null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+    <div className="notebook-cell overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
         <select
           aria-label={`Cell ${index + 1} type`}
           value={cell.type}
@@ -902,29 +906,29 @@ function CellComponent({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onAddAbove}
-            className="rounded p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700"
-            title="Add SQL cell above"
+            onClick={() => setInsertion('above')}
+            className="cell-icon-button"
+            title="Add cell above"
             aria-label="Add cell above"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
+            <Plus className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Above</span>
           </button>
 
           <button
             type="button"
-            onClick={onAddBelow}
-            className="rounded p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700"
-            title="Add SQL cell below"
+            onClick={() => setInsertion('below')}
+            className="cell-icon-button"
+            title="Add cell below"
             aria-label="Add cell below"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
+            <Plus className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Below</span>
           </button>
 
           <button
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="rounded p-1.5 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-gray-700"
+            className="cell-icon-button"
             title="Move up"
             aria-label="Move cell up"
           >
@@ -935,7 +939,7 @@ function CellComponent({
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
-            className="rounded p-1.5 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-gray-700"
+            className="cell-icon-button"
             title="Move down"
             aria-label="Move cell down"
           >
@@ -954,6 +958,18 @@ function CellComponent({
         </div>
       </div>
 
+      {insertion && <AccessibleDialog title={`Add cell ${insertion}`} description="Choose the type of cell to insert." onClose={() => setInsertion(null)} panelClassName="max-w-sm rounded-2xl">
+        <div className="space-y-2 p-4">
+          {(['sql', 'python', 'markdown'] as const).map((type) => <button key={type} type="button" className="cell-insert-choice" data-dialog-initial-focus={type === 'sql' ? true : undefined} onClick={() => {
+            if (insertion === 'above') onAddAbove(type); else onAddBelow(type);
+            setInsertion(null);
+          }}>
+            <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span><span className="block text-sm font-semibold">{type === 'sql' ? 'SQL cell' : type === 'python' ? 'Python cell' : 'Markdown cell'}</span>
+            <span className="mt-1 block text-xs text-gray-600 dark:text-gray-300">{type === 'sql' ? 'Query the selected dataset' : type === 'python' ? 'Run browser-side Python' : 'Write notes and explanations'}</span></span>
+          </button>)}
+        </div>
+      </AccessibleDialog>}
       <div
         className="p-3"
         style={{ height: cell.type === 'markdown' ? '220px' : '300px' }}
@@ -964,7 +980,7 @@ function CellComponent({
   language={languageForCell(cell.type)}
   value={cell.content}
           onChange={(value) => onUpdate(value || '')}
-          theme="vs-dark"
+          theme={resolvedTheme === 'dark' ? 'dataplatform-dark' : 'dataplatform-light'}
           options={{
             minimap: { enabled: false },
             fontSize: 13,

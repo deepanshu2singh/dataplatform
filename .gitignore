@@ -73,3 +73,31 @@ frontend/coverage/
 # OS/editor junk
 .DS_Store
 Thumbs.db
+.vercel
+.env*
+
+# GITHUB SOURCE SYNC: local artifacts and exact safe examples
+/.zip-cache/
+/*.zip
+/SOURCE_MANIFEST.json
+/cloud-*.csv
+/dashboard-presentation-check.csv
+/CREATE-CLOUD-DATASET-CHECKPOINT.ps1
+/DataPlatform_Continuation_Handoff*.md
+/docs/DataPlatform_Continuation_Handoff.md
+/docs/phases/cloud/CLOUD_USER_VERIFICATION.json
+*.tsbuildinfo
+*.log
+*.pfx
+*.p12
+*credentials*.json
+*service-account*.json
+*service_account*.json
+
+# Keep these reviewed placeholder files despite the earlier .env* rule.
+!.env.example
+!backend/.env.example
+!backend/.env.cloud.example
+!production.env.example
+
+# frontend/build contains required source. Do not ignore it.

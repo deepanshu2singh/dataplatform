@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DatasetType(str, Enum):
@@ -38,9 +38,42 @@ class DatasetRead(BaseModel):
 class DatasetPythonExport(BaseModel):
     dataset_id: int
     dataset_name: str
-    csv_text: str
+    csv_text: str | None = None
+    download_url: str | None = None
+    csv_size_bytes: int | None = None
+    sha256: str | None = None
     source_row_count: Optional[int] = None
     loaded_row_count: int
     truncated: bool
     row_limit: int
+
+
+class DatasetUploadConfig(BaseModel):
+    storage_backend: str
+    max_upload_bytes: int
+
+
+class DatasetUploadPrepare(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str = Field(default="", max_length=10_000)
+    filename: str = Field(min_length=1, max_length=255)
+    file_size: int = Field(gt=0)
+
+    @field_validator("name", "filename")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("A nonblank value is required")
+        return value
+
+
+class DatasetSignedUpload(BaseModel):
+    upload_id: str
+    object_key: str
+    token: str
+    tus_endpoint: str
+    bucket: str
+    chunk_size: int
+    expires_at: datetime
 

@@ -71,6 +71,11 @@ export function useLatestKeyedRequests() {
     activeRef.current.clear();
   }, []);
 
+  const cancel = useCallback((key: string) => {
+    activeRef.current.get(key)?.controller.abort();
+    activeRef.current.delete(key);
+  }, []);
+
   const begin = useCallback((key: string): LatestRequestToken => {
     activeRef.current.get(key)?.controller.abort();
 
@@ -92,5 +97,5 @@ export function useLatestKeyedRequests() {
 
   useEffect(() => cancelAll, [cancelAll]);
 
-  return useMemo(() => ({ begin, cancelAll }), [begin, cancelAll]);
+  return useMemo(() => ({ begin, cancel, cancelAll }), [begin, cancel, cancelAll]);
 }

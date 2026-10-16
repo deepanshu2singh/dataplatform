@@ -345,3 +345,81 @@ def test_deleted_notebook_becomes_stale_dashboard_reference(
     ]
     assert len(notebook_issues) == 1
     assert notebook_issues[0]["reference_id"] == notebook_id
+
+
+def test_canvas_roundtrip_and_stale_client_rejection(api_client, user_factory):
+    user = user_factory("canvas-roundtrip")
+    layout = {"version": 2, "locked": True, "widgets": [{
+        "id": "note", "type": "markdown", "title": "Analysis",
+        "config": {"markdown": "Keep this note"},
+        "position": {"x": 4, "y": 17, "w": 8, "h": 16},
+    }]}
+    created = api_client.post("dashboards", headers=user["headers"], json={"name": "Canvas", "layout": layout})
+    assert created.status_code == 201, created.text
+    dashboard = created.json()
+    url = f"dashboards/{dashboard['id']}"
+    read = api_client.get(url, headers=user["headers"])
+    assert read.status_code == 200, read.text
+    assert read.json()["layout"]["widgets"][0]["position"] == layout["widgets"][0]["position"]
+    assert read.json()["layout"]["locked"] is True
+    saved = api_client.put(url, headers=user["headers"], json={"expected_version": dashboard["version"], "name": "Updated canvas", "layout": layout})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["version"] > dashboard["version"]
+    stale = api_client.put(url, headers=user["headers"], json={"expected_version": dashboard["version"], "name": "Stale draft", "layout": layout})
+    assert stale.status_code == 409, stale.text
+    old = api_client.put(url, headers=user["headers"], json={"layout": empty_layout()})
+    assert old.status_code == 409, old.text
+    unchanged = api_client.get(url, headers=user["headers"]).json()
+    assert unchanged["name"] == "Updated canvas" and unchanged["layout"]["version"] == 2
+
+
+def assert_requested_settings_preserved(actual: dict, requested: dict) -> None:
+    # Saved configs include server defaults. Every requested setting must survive,
+    # including nested column options, without requiring those defaults in input.
+    assert isinstance(actual, dict)
+    for key, value in requested.items():
+        assert key in actual, f"Saved setting is missing: {key}"
+        if isinstance(value, dict):
+            assert_requested_settings_preserved(actual[key], value)
+        else:
+            assert actual[key] == value, f"Saved setting changed: {key}"
+
+
+def test_presentation_roundtrip_execution_and_owner_boundary(api_client, user_factory, sales_dataset_factory):
+    owner = user_factory("presentation-owner")
+    other = user_factory("presentation-other")
+    dataset = sales_dataset_factory(owner["headers"])
+    query = "SELECT product, region, SUM(revenue) AS value, SUM(quantity) AS x FROM dataset GROUP BY product, region ORDER BY product, region"
+    chart_types = ["bar", "horizontal_bar", "line", "area", "stacked_bar", "stacked_area", "pie", "donut", "scatter", "combo"]
+    widgets = []
+    for index, kind in enumerate(chart_types):
+        config = {"chart_type": kind, "x_column": "x" if kind == "scatter" else "product", "y_column": "value", "palette": "warm", "format": "currency", "currency": "GBP", "decimals": 1, "show_labels": True}
+        if kind.startswith("stacked"):
+            config["series_column"] = "region"
+        if kind == "combo":
+            config["y2_column"] = "x"
+        widgets.append({"id": kind, "type": "chart", "title": kind, "position": {"x": index % 2 * 6, "y": index // 2 * 10, "w": 6, "h": 10}, "source": {"dataset_id": dataset["id"], "query": query, "limit": 500}, "config": config})
+    table = table_widget(dataset["id"], query)
+    table.update(id="formatted-table", position={"x": 0, "y": 50, "w": 6, "h": 10}, config={"columns": ["product", "value"], "page_size": 10, "sort_column": "value", "sort_direction": "desc", "density": "compact", "show_row_numbers": True, "column_options": {"value": {"width": 180, "format": "currency", "currency": "GBP", "decimals": 1, "align": "right"}}})
+    widgets.append(table)
+    widgets.append({"id": "margin", "type": "metric", "title": "Margin", "position": {"x": 6, "y": 50, "w": 6, "h": 10}, "source": {"dataset_id": dataset["id"], "query": "SELECT SUM(revenue) / SUM(revenue) * 0.25 AS margin FROM dataset", "limit": 2}, "config": {"value_column": "margin", "label": "Gross margin", "format": "percent", "percent_scale": "fraction", "decimals": 1}})
+    created = api_client.post("dashboards", headers=owner["headers"], json={"name": "Presentation", "layout": {"version": 3, "locked": True, "widgets": widgets}})
+    assert created.status_code == 201, created.text
+    dashboard = created.json()
+    url = f"dashboards/{dashboard['id']}"
+    loaded = api_client.get(url, headers=owner["headers"])
+    assert loaded.status_code == 200, loaded.text
+    layout = loaded.json()["layout"]
+    assert layout["version"] == 3 and layout["locked"] is True
+    for original, saved in zip(widgets, layout["widgets"]):
+        assert saved["position"] == original["position"]
+        assert_requested_settings_preserved(saved["config"], original["config"])
+        result = api_client.post(f"{url}/widgets/{saved['id']}/execute", headers=owner["headers"])
+        assert result.status_code == 200, result.text
+        assert result.json()["visualization"]["kind"] == saved["config"].get("chart_type", saved["type"])
+        assert result.json()["visualization"]["options"] == saved["config"]
+    assert api_client.post(f"{url}/widgets/combo/execute", headers=other["headers"]).status_code == 404
+    old_layout = {**layout, "version": 2}
+    rejected = api_client.put(url, headers=owner["headers"], json={"expected_version": dashboard["version"], "layout": old_layout})
+    assert rejected.status_code == 409, rejected.text
+    assert api_client.get(url, headers=owner["headers"]).json()["layout"] == layout

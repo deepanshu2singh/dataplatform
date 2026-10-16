@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import api_router
 from app.core.config import settings
+from app.core.cloud_response import CloudResponseLimitMiddleware
 from app.core.csrf import OriginCSRFMiddleware
 from app.core.health import get_readiness_status
 from app.core.observability import (
@@ -40,6 +41,11 @@ app = FastAPI(
 # This lets request logging/correlation cover CSRF responses and unexpected
 # failures, while the outer CORS layer can still decorate safe 500 responses
 # for the configured frontend origin.
+app.add_middleware(
+    CloudResponseLimitMiddleware,
+    enabled=settings.STORAGE_BACKEND == "supabase",
+)
+
 app.add_middleware(
     OriginCSRFMiddleware,
     frontend_origin=settings.FRONTEND_URL,

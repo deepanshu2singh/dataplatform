@@ -1,0 +1,20 @@
+{
+  "source_files": 232,
+  "modified_files": 6,
+  "new_files": 2,
+  "guarded_cross_component_prerequisites": 120,
+  "focused_tests_passed": 40,
+  "warnings": 2,
+  "guard_simulation": "PASS (Python, including later edit rejection, idempotence and exact rollback)",
+  "powershell_execution": "not available locally; Windows verification pending",
+  "artifacts": {
+    "DataPlatform_Cloud_Readiness_Patch.zip": {
+      "bytes": 31029,
+      "sha256": "65ffaca54be33612197b9c0fe0ebb15572e7bfdbadec966803971b29ff4fa651"
+    },
+    "DataPlatform_Cloud_Readiness_Source_Checkpoint.zip": {
+      "bytes": 14478414,
+      "sha256": "664ea6133e2faa7787ef575539c5bbcec51f344f5b5fec574dccd42afef74d6a"
+    }
+  }
+}

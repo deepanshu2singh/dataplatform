@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 
 from alembic.config import Config
@@ -10,12 +11,54 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.observability import get_request_id
+from app.core.config import settings
 from app.db.session import engine
 
 
 _READINESS_LOGGER = logging.getLogger("app.health")
 _READINESS_TIMEOUT_SECONDS = 2.0
+_PRODUCTION_READINESS_TIMEOUT_SECONDS = 10.0
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _readiness_timeout_seconds() -> float:
+    # Production may make a fresh TLS/pooler connection on each cold invocation.
+    # Development/test probes retain their existing two-second budget.
+    if settings.ENVIRONMENT == "production":
+        return _PRODUCTION_READINESS_TIMEOUT_SECONDS
+    return _READINESS_TIMEOUT_SECONDS
+
+
+def _safe_error_details(exc: BaseException, timeout_seconds: float) -> dict[str, object]:
+    """Describe wrapped driver failures without serializing exception values."""
+
+    details: dict[str, object] = {"timeout_seconds": timeout_seconds}
+    exception_types: list[str] = []
+    pending = [exc]
+    seen: set[int] = set()
+
+    while pending and len(seen) < 8:
+        current = pending.pop(0)
+        if not isinstance(current, BaseException) or id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        name = type(current).__name__
+        if len(name) <= 80 and name.isidentifier() and name not in exception_types:
+            exception_types.append(name)
+
+        for attribute in ("sqlstate", "pgcode"):
+            code = getattr(current, attribute, None)
+            if isinstance(code, str) and re.fullmatch(r"[0-9A-Z]{5}", code):
+                details["sqlstate"] = code
+
+        for attribute in ("orig", "__cause__", "__context__"):
+            wrapped = getattr(current, attribute, None)
+            if isinstance(wrapped, BaseException):
+                pending.append(wrapped)
+
+    details["exception_types"] = exception_types
+    return details
 
 
 def _expected_alembic_head() -> str:
@@ -52,8 +95,10 @@ async def get_readiness_status(
         "migrations": "unknown",
     }
 
+    timeout_seconds = _readiness_timeout_seconds()
+
     try:
-        async with asyncio.timeout(_READINESS_TIMEOUT_SECONDS):
+        async with asyncio.timeout(timeout_seconds):
             async with db_engine.connect() as connection:
                 await connection.execute(text("SELECT 1"))
                 checks["database"] = "ok"
@@ -62,7 +107,7 @@ async def get_readiness_status(
                     current_revision = await connection.scalar(
                         text("SELECT version_num FROM alembic_version LIMIT 1")
                     )
-                except Exception:
+                except Exception as exc:
                     _READINESS_LOGGER.warning(
                         "Readiness migration check unavailable",
                         extra={
@@ -70,18 +115,26 @@ async def get_readiness_status(
                             "reason": "migration_state_unavailable",
                             "operation": "readiness",
                             "request_id": get_request_id(),
+                            **_safe_error_details(exc, timeout_seconds),
                         },
                     )
                     checks["migrations"] = "unavailable"
                     return False, checks
-    except Exception:
+    except Exception as exc:
+        # A timeout during the revision read must not misreport a successful
+        # database ping as a database outage.
+        reason = "database_unavailable"
+        if checks["database"] == "ok":
+            checks["migrations"] = "unavailable"
+            reason = "migration_state_unavailable"
         _READINESS_LOGGER.warning(
-            "Readiness database check failed",
+            "Readiness dependency check failed",
             extra={
                 "event": "readiness_check_failed",
-                "reason": "database_unavailable",
+                "reason": reason,
                 "operation": "readiness",
                 "request_id": get_request_id(),
+                **_safe_error_details(exc, timeout_seconds),
             },
         )
         return False, checks

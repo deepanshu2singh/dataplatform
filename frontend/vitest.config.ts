@@ -1,8 +1,10 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+import { editorSanitizerAlias } from './build/editorSanitizer.ts';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: { alias: [editorSanitizerAlias] },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

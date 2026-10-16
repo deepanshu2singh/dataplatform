@@ -175,6 +175,27 @@ function renderNewNotebook() {
 }
 
 describe('NotebookPage', () => {
+  it.each([['sql', 'above'], ['python', 'above'], ['markdown', 'above'], ['sql', 'below'], ['python', 'below'], ['markdown', 'below']] as const)('inserts a %s cell %s and saves its position without replacing existing cells', async (type, position) => {
+    mockNotebookLoad();
+    const putSpy = vi.spyOn(api, 'put').mockImplementation(async (_url, payload) => ({ data: { ...SAVED_NOTEBOOK, ...(payload as object) } }) as never);
+    const user = userEvent.setup();
+    renderNotebook('/notebooks/12');
+    await screen.findByDisplayValue('Quarterly Analysis');
+    const opener = screen.getAllByRole('button', { name: `Add cell ${position}` })[1];
+    await user.click(opener);
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${type === 'sql' ? 'SQL' : type === 'python' ? 'Python' : 'Markdown'} cell`) }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+    const expected = position === 'above' ? ['markdown', type, 'sql'] : ['markdown', 'sql', type];
+    expect(screen.getAllByLabelText(/^Cell \d+ type$/).map(element => (element as HTMLSelectElement).value)).toEqual(expected);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(putSpy).toHaveBeenCalled());
+    const content = (putSpy.mock.calls[0][1] as typeof SAVED_NOTEBOOK).content;
+    expect(content.cells.map(cell => cell.type)).toEqual(expected);
+    expect(content.cells.find(cell => cell.id === 'md-1')?.content).toBe('# Saved analysis');
+    expect(content.cells.find(cell => cell.id === 'sql-1')?.content).toContain('SELECT product');
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
     pythonMocks.loadDataset.mockReset();

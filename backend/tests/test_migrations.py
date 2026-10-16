@@ -8,9 +8,10 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 import asyncpg
+import pytest
 
-APP_TABLES = {"users", "datasets", "notebooks", "dashboards"}
-HEAD_REVISION = "20261006_0004"
+APP_TABLES = {"users", "datasets", "notebooks", "dashboards", "dataset_uploads"}
+HEAD_REVISION = "20261011_0005"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -211,4 +212,76 @@ def test_downgrade_to_base_removes_fresh_schema() -> None:
         assert not (APP_TABLES & asyncio.run(_table_names(direct_url)))
         assert asyncio.run(_dataset_enum_exists(direct_url)) is False
 
+    _with_database(body)
+
+
+@pytest.mark.parametrize("race", ["complete", "cancel"])
+def test_cloud_upload_locks_serialize_workers(monkeypatch, tmp_path, race) -> None:
+    """Real PostgreSQL row locks, independent sessions; mocked object transport."""
+    from types import SimpleNamespace
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select, func
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    from fastapi import HTTPException
+    from app.core.config import settings
+    from app.models.dataset_upload import DatasetUpload
+    from app.models.dataset import Dataset
+    from app.services import dataset_uploads, dataset_files
+    from app.api.routes.datasets import infer_csv_schema
+
+    def body(direct_url, async_url):
+        upgrade = _run_alembic(async_url, "upgrade", "head")
+        assert upgrade.returncode == 0, upgrade.stderr
+        monkeypatch.setattr(settings, "STORAGE_BACKEND", "supabase")
+        monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+        monkeypatch.setattr(settings, "SUPABASE_STORAGE_BUCKET", "datasets")
+
+        async def run():
+            connection = await asyncpg.connect(direct_url)
+            try:
+                owner_id = await connection.fetchval("INSERT INTO users(email, hashed_password, is_active, is_superuser) VALUES('cloud@example.com','test',true,false) RETURNING id")
+            finally: await connection.close()
+            engine = create_async_engine(async_url, poolclass=NullPool)
+            sessions = async_sessionmaker(engine, expire_on_commit=False)
+            started, release = asyncio.Event(), asyncio.Event()
+            downloads, deleted = [], []
+            content = b"a\n1\n2\n"
+            async def download(key, path):
+                downloads.append(key)
+                started.set()
+                await release.wait()
+                path.write_bytes(content)
+                return len(content)
+            async def put(*args, **kwargs): pass
+            async def delete(key): deleted.append(key)
+            storage = SimpleNamespace(download_to_path=download, upload_bytes=put, delete_object=delete)
+            monkeypatch.setattr(dataset_files, "get_supabase_storage_service", lambda:storage)
+            monkeypatch.setattr(dataset_uploads, "get_supabase_storage_service", lambda:storage)
+            upload_id = uuid4().hex
+            try:
+                async with sessions() as db:
+                    db.add(DatasetUpload(id=upload_id,owner_id=owner_id,object_key=f"users/{owner_id}/{upload_id}.csv",bucket="datasets",original_filename="test.csv",name="Cloud",expected_size=len(content),status="pending",expires_at=datetime.now(timezone.utc)+timedelta(hours=1)))
+                    await db.commit()
+                async def complete():
+                    async with sessions() as db:
+                        return await dataset_uploads.complete_upload(db,owner_id,upload_id,infer_csv_schema)
+                async def cancel():
+                    async with sessions() as db:
+                        try: await dataset_uploads.cancel_upload(db,owner_id,upload_id)
+                        except HTTPException as error: return error.status_code
+                first = asyncio.create_task(complete())
+                await asyncio.wait_for(started.wait(), 10)
+                second = asyncio.create_task(complete() if race == "complete" else cancel())
+                release.set()
+                left, right = await asyncio.wait_for(asyncio.gather(first,second), 20)
+                assert right.id == left.id if race == "complete" else right == 409
+                assert len(downloads) == 1 and deleted == []
+                async with sessions() as db:
+                    assert await db.scalar(select(func.count()).select_from(Dataset)) == 1
+                assert not list(tmp_path.iterdir())
+            finally:
+                release.set()
+                await engine.dispose()
+        asyncio.run(run())
     _with_database(body)

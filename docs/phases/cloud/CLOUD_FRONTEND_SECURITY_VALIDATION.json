@@ -1,0 +1,33 @@
+{
+  "input_source_files": 239,
+  "input_checkpoint_sha256": "0282d80ea9109c5f4c8d531c760b0a24a737e76820f6832ff09ef6cdd7d2d736",
+  "input_audit_sha256": "20508db553721f20dd352d362ec2a1ce0663572f2f6335affd5ef7aa1da8ab86",
+  "input_audit_library_file_id": "libfile_5ad79e6de88481918b5c2e8828e43ded",
+  "before_vulnerable_packages": 3,
+  "after_known_vulnerabilities": 0,
+  "monaco": "0.56.0",
+  "dompurify": "3.4.16",
+  "source_map_js": "1.2.2",
+  "sanitizer_tests_passed": 4,
+  "source_map_tests_passed": 2,
+  "notebook_tests_passed": 7,
+  "typescript": "PASS",
+  "lint_errors": 0,
+  "existing_lint_warnings": 9,
+  "cloud_build": "PASS",
+  "patched_module_in_bundle": "PASS",
+  "embedded_module_excluded": "PASS",
+  "negative_unaliased_build_rejected": "PASS",
+  "immutable_python_assets": "PASS",
+  "same_origin_api": "PASS",
+  "fresh_install": "PASS",
+  "windows_powershell_execution": "NOT_RUN_HERE",
+  "windows_apply_tests": "PENDING",
+  "new_hosted_build_and_browser_smoke": "PENDING",
+  "physical_source_scope": "4 modified,5 added",
+  "lock_semantic_changes": [
+    "",
+    "node_modules/dompurify",
+    "node_modules/source-map-js"
+  ]
+}

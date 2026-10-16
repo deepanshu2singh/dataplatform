@@ -161,3 +161,29 @@ def test_request_log_omits_query_headers_cookies_and_body() -> None:
 
     entry = json.loads(log_output.strip())
     assert entry["path"] == "/probe"
+
+
+def test_readiness_diagnostic_fields_are_bounded_and_validate_their_shape() -> None:
+    record = logging.LogRecord("app.health", logging.WARNING, __file__, 1, "Readiness failed", (), None)
+    record.exception_types = ["OperationalError", "InvalidPasswordError"]
+    record.sqlstate = "28P01"
+    record.timeout_seconds = 10.0
+    record.database_url = "postgresql://user:PRIVATE_PASSWORD@private.invalid/db"
+
+    rendered = JSONLogFormatter().format(record)
+    entry = json.loads(rendered)
+    assert entry["exception_types"] == ["OperationalError", "InvalidPasswordError"]
+    assert entry["sqlstate"] == "28P01"
+    assert entry["timeout_seconds"] == 10.0
+    assert "PRIVATE_PASSWORD" not in rendered
+    assert "private.invalid" not in rendered
+
+    record.exception_types = [{"secret": "PRIVATE_DICT"}, "PRIVATE TEXT"]
+    record.sqlstate = "PRIVATE_CODE"
+    record.timeout_seconds = {"secret": "PRIVATE_TIMEOUT"}
+    rendered = JSONLogFormatter().format(record)
+    entry = json.loads(rendered)
+    assert entry["exception_types"] == []
+    assert "sqlstate" not in entry
+    assert "timeout_seconds" not in entry
+    assert "PRIVATE" not in rendered

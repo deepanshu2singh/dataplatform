@@ -1,0 +1,51 @@
+{
+  "phase": "dashboard canvas A",
+  "status": "prepared local; Windows/PostgreSQL/live acceptance pending",
+  "baseline_sha256": "970b770bb664e8819393b09ba9e9abaf3bf2f3de1cfb9a63b9c608f373e1bdc6",
+  "baseline_files": 253,
+  "frontend_tests": {
+    "tests": 134,
+    "files": 25
+  },
+  "backend_local_tests": 139,
+  "backend_postgresql_checks": "27 unavailable here: missing TEST_DATABASE_URL; integration suite not run locally",
+  "lint": {
+    "errors": 0,
+    "existing_warnings": 9
+  },
+  "cloud_build": "pass",
+  "dependencies_unchanged": true,
+  "migration_files_unchanged": true,
+  "storage_auth_notebook_runtime_unchanged": true,
+  "dashboard_layout_version": 2,
+  "row_version_precondition": true,
+  "source_rollback": "only safe to redeploy before any production v2 save; explicit script guard",
+  "live_deployment_unchanged": "dataplatform-v1-gujuutiqe-deepanshu1927.vercel.app",
+  "next": [
+    "B charts and presentation controls",
+    "C connected dataset filters and slicers"
+  ],
+  "browser": {
+    "checks": [
+      "legacy load performs no write",
+      "pointer drag snaps and makes no API call",
+      "Escape cancels drag",
+      "pointer resize snaps dimensions",
+      "keyboard resize changes actual SVG plot width and height",
+      "layout undo/redo keeps data and makes no API call",
+      "duplicate has independent stable ID",
+      "lock disables placement",
+      "Save/reload retains exact positions, dimensions, count and IDs",
+      "read-only viewer uses same saved layout",
+      "mobile stacks without overflow or database writes",
+      "numeric placement controls resize table and retain results",
+      "409 preserves unsaved draft",
+      "new markdown widget creation preserves plain-text rendering"
+    ],
+    "screens": 7,
+    "sampled_text_pairs": 522,
+    "contrast_failures": 0,
+    "unexpected_errors": [],
+    "api": "synthetic fixture, production CSP, real Recharts SVG"
+  }
+}

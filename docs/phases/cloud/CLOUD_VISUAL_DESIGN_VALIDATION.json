@@ -1,0 +1,31 @@
+{
+  "status": "prepared-local-pass; Windows apply/check/live acceptance pending",
+  "baseline_sha256": "f151d4b41f9c679292840160fef2a0a18608ae7b79f8e19a8f76fcae49328a3e",
+  "baseline_source_files": 245,
+  "frontend_tests": {
+    "passed": 123,
+    "files": 23
+  },
+  "typescript": "pass",
+  "lint": {
+    "errors": 0,
+    "existing_warnings": 9
+  },
+  "production_build": "pass",
+  "editor_sanitizer_guard": "pass",
+  "self_hosted_python_assets": "pass",
+  "api_base": "/api/v1",
+  "dependency_files_unchanged": true,
+  "audit_known_vulnerabilities": 0,
+  "browser_screens": 24,
+  "rendered_text_samples": 1078,
+  "contrast_failures": 0,
+  "unexpected_browser_errors": 0,
+  "browser_qa": "synthetic APIs; real Monaco and self-hosted Pyodide; production CSP",
+  "real_browser_python": "5 rows; revenue 5115.33",
+  "sql_api": "fixture response, not a live backend query",
+  "backend_and_migrations_unchanged": true,
+  "live_deployment_unchanged": "dataplatform-v1-kr3e7xoen-deepanshu1927.vercel.app",
+  "windows_powershell_execution": "not available here; Windows acceptance pending",
+  "partial_byte_resume": "user-deferred, unverified"
+}

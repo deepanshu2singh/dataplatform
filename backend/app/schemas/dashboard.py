@@ -45,89 +45,118 @@ class DashboardDataSource(BaseModel):
         return clean_value
 
 
-class DashboardChartConfig(BaseModel):
-    chart_type: Literal["bar", "line", "pie", "donut"]
-    x_column: str = Field(min_length=1, max_length=255)
-    y_column: str = Field(min_length=1, max_length=255)
-    series_column: str | None = Field(default=None, max_length=255)
-    show_legend: bool = True
-
-    @field_validator("x_column", "y_column", "series_column")
-    @classmethod
-    def normalize_column(
-        cls,
-        value: str | None,
-    ) -> str | None:
-        if value is None:
-            return None
-
-        clean_value = value.strip()
-
-        if not clean_value:
-            raise ValueError("Chart column names cannot be empty.")
-
-        return clean_value
+ChartType = Literal["bar", "line", "pie", "donut", "area", "horizontal_bar", "stacked_bar", "stacked_area", "scatter", "combo"]
+Currency = Literal["GBP", "USD", "EUR", "INR", "CAD", "AUD", "JPY"]
 
 
-class DashboardMetricConfig(BaseModel):
-    value_column: str = Field(min_length=1, max_length=255)
-    label: str | None = Field(default=None, max_length=255)
+class DashboardNumberFormat(BaseModel):
     format: Literal["number", "currency", "percent", "text"] = "number"
     decimals: int = Field(default=2, ge=0, le=6)
+    currency: Currency | None = None
+    percent_scale: Literal["whole", "fraction"] = "whole"
+    compact: bool = False
     prefix: str | None = Field(default=None, max_length=32)
     suffix: str | None = Field(default=None, max_length=32)
+
+    @field_validator("prefix", "suffix")
+    @classmethod
+    def clean_affix(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+
+class DashboardChartConfig(DashboardNumberFormat):
+    chart_type: ChartType
+    x_column: str = Field(min_length=1, max_length=255)
+    y_column: str = Field(min_length=1, max_length=255)
+    y2_column: str | None = Field(default=None, max_length=255)
+    series_column: str | None = Field(default=None, max_length=255)
+    show_legend: bool = True
+    show_grid: bool = True
+    show_labels: bool = False
+    palette: Literal["teal", "ocean", "warm", "mono"] = "teal"
+    curve: Literal["linear", "monotone", "step"] = "monotone"
+    x_axis_title: str | None = Field(default=None, max_length=100)
+    y_axis_title: str | None = Field(default=None, max_length=100)
+    right_axis_title: str | None = Field(default=None, max_length=100)
+    secondary_axis: bool = True
+    sort_by: Literal["none", "label", "value"] = "none"
+    sort_direction: Literal["asc", "desc"] = "asc"
+
+    @field_validator("x_column", "y_column", "y2_column", "series_column", "x_axis_title", "y_axis_title", "right_axis_title")
+    @classmethod
+    def normalize_column(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Chart field names and axis titles cannot be blank; use null for optional fields.")
+        return clean
+
+    @model_validator(mode="after")
+    def validate_chart_contract(self) -> "DashboardChartConfig":
+        if self.chart_type in {"stacked_bar", "stacked_area"} and self.series_column is None:
+            raise ValueError("Stacked charts require a series column.")
+        if self.chart_type == "combo":
+            if self.y2_column is None or self.y2_column == self.y_column:
+                raise ValueError("Combo charts require a different second numeric column.")
+            if self.series_column is not None:
+                raise ValueError("Combo charts use two numeric columns, not a series column.")
+        if self.format == "text":
+            raise ValueError("Charts require a numeric display format.")
+        return self
+
+
+class DashboardMetricConfig(DashboardNumberFormat):
+    value_column: str = Field(min_length=1, max_length=255)
+    label: str | None = Field(default=None, max_length=255)
 
     @field_validator("value_column")
     @classmethod
     def normalize_value_column(cls, value: str) -> str:
-        clean_value = value.strip()
-
-        if not clean_value:
+        clean = value.strip()
+        if not clean:
             raise ValueError("Metric value_column cannot be empty.")
+        return clean
 
-        return clean_value
-
-    @field_validator("label", "prefix", "suffix")
+    @field_validator("label")
     @classmethod
-    def normalize_optional_text(
-        cls,
-        value: str | None,
-    ) -> str | None:
-        if value is None:
-            return None
+    def normalize_label(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
-        return value.strip() or None
+
+class DashboardColumnOptions(DashboardNumberFormat):
+    format: Literal["number", "currency", "percent", "text"] = "text"
+    width: int | None = Field(default=None, ge=80, le=600)
+    align: Literal["auto", "left", "center", "right"] = "auto"
 
 
 class DashboardTableConfig(BaseModel):
-    columns: list[str] | None = Field(
-        default=None,
-        max_length=MAX_TABLE_COLUMNS,
-    )
+    columns: list[str] | None = Field(default=None, max_length=MAX_TABLE_COLUMNS)
+    page_size: Literal[10, 25, 50, 100] = 25
+    sort_column: str | None = Field(default=None, min_length=1, max_length=255)
+    sort_direction: Literal["asc", "desc"] = "asc"
+    density: Literal["comfortable", "compact"] = "comfortable"
+    show_row_numbers: bool = False
+    column_options: dict[str, DashboardColumnOptions] = Field(default_factory=dict, max_length=MAX_TABLE_COLUMNS)
 
     @field_validator("columns")
     @classmethod
-    def normalize_columns(
-        cls,
-        value: list[str] | None,
-    ) -> list[str] | None:
+    def normalize_columns(cls, value: list[str] | None) -> list[str] | None:
         if value is None:
             return None
-
-        clean_columns: list[str] = []
-
-        for column in value:
-            clean_column = column.strip()
-
-            if not clean_column:
-                raise ValueError("Table column names cannot be empty.")
-
-            clean_columns.append(clean_column)
-
-        if len(clean_columns) != len(set(clean_columns)):
+        clean = [column.strip() for column in value]
+        if any(not column for column in clean):
+            raise ValueError("Table column names cannot be empty.")
+        if len(set(clean)) != len(clean):
             raise ValueError("Table columns must be unique.")
+        return clean
 
-        return clean_columns
+    @field_validator("column_options")
+    @classmethod
+    def validate_option_keys(cls, value: dict[str, DashboardColumnOptions]) -> dict[str, DashboardColumnOptions]:
+        if any(not key.strip() or len(key) > 255 for key in value):
+            raise ValueError("Column option keys must be nonblank result column names up to 255 characters.")
+        return value
 
 
 class DashboardMarkdownConfig(BaseModel):
@@ -196,7 +225,8 @@ class DashboardWidget(BaseModel):
 
 
 class DashboardLayout(BaseModel):
-    version: Literal[1] = 1
+    version: Literal[1, 2, 3] = 1
+    locked: bool = False
     widgets: list[DashboardWidget] = Field(
         default_factory=list,
         max_length=MAX_DASHBOARD_WIDGETS,
@@ -208,6 +238,18 @@ class DashboardLayout(BaseModel):
 
         if len(widget_ids) != len(set(widget_ids)):
             raise ValueError("Dashboard widget ids must be unique.")
+
+        if self.version >= 2:
+            for widget in self.widgets:
+                p = widget.position
+                if not (3 <= p.w <= 12 and 5 <= p.h <= 40 and p.x + p.w <= 12 and p.y + p.h <= 1000):
+                    raise ValueError("Canvas widget must fit the 12-column / 1000-row grid (width 3-12, height 5-40).")
+            for index, widget in enumerate(self.widgets):
+                a = widget.position
+                for other in self.widgets[index + 1:]:
+                    b = other.position
+                    if a.x < b.x + b.w and a.x + a.w > b.x and a.y < b.y + b.h and a.y + a.h > b.y:
+                        raise ValueError("Canvas widgets cannot overlap.")
 
         serialized = json.dumps(
             self.model_dump(mode="json"),
@@ -261,6 +303,7 @@ class DashboardCreate(BaseModel):
 
 
 class DashboardUpdate(BaseModel):
+    expected_version: int | None = Field(default=None, gt=0)
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(
         default=None,
@@ -317,6 +360,7 @@ class DashboardReferenceIssue(BaseModel):
 
 
 class DashboardRead(BaseModel):
+    version: int = Field(default=1, gt=0)
     id: int
     name: str
     description: str | None = None
@@ -335,7 +379,8 @@ class DashboardWidgetPreviewRequest(BaseModel):
 
 
 class DashboardWidgetVisualization(BaseModel):
-    kind: Literal["table", "metric", "bar", "line", "pie", "donut"]
+    kind: Literal["table", "metric", "bar", "line", "pie", "donut", "area", "horizontal_bar", "stacked_bar", "stacked_area", "scatter", "combo"]
+    options: dict[str, Any] = Field(default_factory=dict)
     x_column: str | None = None
     y_column: str | None = None
     series_column: str | None = None

@@ -1,0 +1,96 @@
+{
+  "phase": "dashboard-chart-presentation-B",
+  "status": "prepared; local checks passed; Windows and live acceptance pending",
+  "input_checkpoint": "cloud-dashboard-canvas-accepted-20261015-215326-b539f902.zip",
+  "input_sha256": "47d756eb7d8075f4adf7a2a943dd74b2c5abbd3b194431bfcbb551937f80f152",
+  "baseline_source_entries_verified": 261,
+  "frontend": {
+    "tests": 150,
+    "files": 29,
+    "status": "PASS",
+    "lint_errors": 0,
+    "existing_lint_warnings": 9,
+    "new_lint_warnings": 0,
+    "typescript_cloud_build_sanitizer_guard_self_hosted_python": "PASS"
+  },
+  "backend_local": {
+    "tests": 178,
+    "warnings": 4,
+    "status": "PASS",
+    "runtime": "Python 3.12; Linux; no PostgreSQL",
+    "excluded": [
+      "integration",
+      "test_migrations.py",
+      "test_concurrency_migration.py",
+      "test_optimistic_concurrency.py",
+      "test_relational_integrity_migration.py",
+      "test_data_integrity_migration.py"
+    ]
+  },
+  "browser": {
+    "status": "PASS",
+    "production_build": true,
+    "actual_production_csp": true,
+    "api_data": "synthetic fixtures; no live Supabase access",
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "reduced_motion": "reduce",
+    "checks": [
+      "All 10 real SVG charts light/dark; combo bar+line; viewer table sort/page/reset does not save",
+      "390px layouts remain within viewport in light/dark",
+      "All ten chart types render inside the real editor preview without automatic SQL execution",
+      "Actual field discovery; instant style with zero preview calls; explicit preview; version3 save/reload retains chart settings and placement",
+      "409 save preserves draft"
+    ],
+    "unexpected_runtime_csp_errors": [],
+    "actual_svg_chart_combinations": 20,
+    "editor_real_chart_types": 10,
+    "visual_screenshots_inspected": true,
+    "screenshots_delivered": false,
+    "full_accessibility_certification": false
+  },
+  "package_guard_simulation": "PASS; original/after bytes, idempotence, later-edit and prerequisite conflict, partial apply/rollback, corrupt package rejection, full source CRC and hashes. Python simulation only; native PowerShell unavailable.",
+  "unchanged": [
+    "dependency manifests and lockfiles",
+    "runtime selector and asset bytes",
+    "Monaco sanitizer build guard",
+    "Dockerfiles and Compose files",
+    "Vercel config",
+    "auth/storage/upload/notebook code",
+    "SQL validation and execution service",
+    "database schema/migrations",
+    "credentials and cloud resources"
+  ],
+  "contracts": {
+    "charts": 10,
+    "chart_points_cap": 500,
+    "query_rows_cap": 1000,
+    "series_cap": 12,
+    "metric_exactly_one_row": true,
+    "layout_reads": [
+      1,
+      2,
+      3
+    ],
+    "deliberate_save_layout_version": 3,
+    "v2_to_v3_downgrade": "409",
+    "optimistic_row_version": "preserved",
+    "table_interactions": "bounded response only; no saved-default writes from viewer",
+    "combo_value_formatting": "shared; use Number for unlike units",
+    "filters_slicers": "phase C pending"
+  },
+  "required_next": [
+    "Apply guarded patch on Windows",
+    "Run bundled full Docker/PostgreSQL API/integration and frontend checks",
+    "Deploy only after checks pass",
+    "Health 200 and live presentation acceptance",
+    "Fresh actual source capture before C"
+  ],
+  "rollback": "Old v2-only parser is incompatible after a production v3 Save. No automatic data downgrade. Source rollback requires a truthful -NoProductionPresentationSaves assertion."
+}

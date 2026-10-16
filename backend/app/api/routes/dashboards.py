@@ -1,4 +1,5 @@
-import asyncio
+import math
+import json
 from collections.abc import Iterable
 from typing import Any
 
@@ -30,6 +31,8 @@ from app.schemas.dashboard import (
     MAX_CHART_POINTS,
 )
 from app.services.sql_executor import SQLValidationError, sql_executor
+from app.services.dataset_execution import execute_dataset_sql
+from app.services.dataset_files import DatasetFileError
 
 router = APIRouter()
 
@@ -198,7 +201,15 @@ async def update_dashboard(
         current_user.id,
     )
 
-    update_data = dashboard_in.model_dump(exclude_unset=True)
+    stored_layout = parse_dashboard_layout(dashboard)
+    if dashboard_in.layout is not None and dashboard_in.layout.version < stored_layout.version:
+        raise HTTPException(status_code=409, detail="This dashboard uses newer presentation settings. Reload this page before editing.")
+    canvas_update = stored_layout.version >= 2 or (dashboard_in.layout is not None and dashboard_in.layout.version >= 2)
+    if canvas_update and dashboard_in.expected_version != dashboard.version:
+        raise HTTPException(status_code=409, detail="This dashboard changed in another tab. Your draft is still here; open the latest dashboard in another tab before deciding which changes to keep.")
+    if dashboard_in.expected_version is not None and dashboard_in.expected_version != dashboard.version:
+        raise HTTPException(status_code=409, detail="Dashboard changed in another tab. Reload before saving.")
+    update_data = dashboard_in.model_dump(exclude_unset=True, exclude={"expected_version"})
 
     if "layout" in update_data and dashboard_in.layout is not None:
         await validate_layout_references(
@@ -312,12 +323,13 @@ async def execute_widget_data(
         execution_limit = min(execution_limit, 2)
 
     try:
-        result = await asyncio.to_thread(
-            sql_executor.execute,
+        result = await execute_dataset_sql(
+            dataset,
             source.query,
-            dataset.config,
             execution_limit,
         )
+    except DatasetFileError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
     except SQLValidationError as exc:
         raise HTTPException(
             status_code=400,
@@ -373,9 +385,16 @@ def build_widget_visualization(
                 ),
             )
 
+        option_columns = set(config.column_options)
+        if config.sort_column:
+            option_columns.add(config.sort_column)
+        if not option_columns.issubset(columns):
+            raise HTTPException(400, "Table sort/format settings reference missing result columns.")
+
         return DashboardWidgetVisualization(
             kind="table",
             display_columns=display_columns,
+            options=config.model_dump(mode="json", exclude_none=True),
         )
 
     if widget.type == "metric":
@@ -400,6 +419,7 @@ def build_widget_visualization(
 
         if (
             config.format in {"number", "currency", "percent"}
+            and value is not None
             and not is_number(value)
         ):
             raise HTTPException(
@@ -418,12 +438,15 @@ def build_widget_visualization(
             decimals=config.decimals,
             prefix=config.prefix,
             suffix=config.suffix,
+            options=config.model_dump(mode="json", exclude_none=True),
         )
 
     if widget.type == "chart":
         config = DashboardChartConfig.model_validate(widget.config)
 
         required_columns = [config.x_column, config.y_column]
+        if config.chart_type == "combo" and config.y2_column:
+            required_columns.append(config.y2_column)
 
         if config.series_column is not None:
             required_columns.append(config.series_column)
@@ -443,32 +466,39 @@ def build_widget_visualization(
                 ),
             )
 
-        y_values = [
-            row.get(config.y_column)
-            for row in data
-            if row.get(config.y_column) is not None
-        ]
-
-        if not y_values or not all(is_number(value) for value in y_values):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f'Chart Y column "{config.y_column}" must contain '
-                    "numeric values."
-                ),
-            )
-
-        if (
-            config.chart_type in {"pie", "donut"}
-            and any(value < 0 for value in y_values)
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Pie and donut charts cannot display negative values.",
-            )
+        numeric_columns = [config.y_column]
+        if config.chart_type == "scatter":
+            numeric_columns.append(config.x_column)
+        if config.chart_type == "combo" and config.y2_column:
+            numeric_columns.append(config.y2_column)
+        for column in numeric_columns:
+            values = [row.get(column) for row in data if row.get(column) is not None]
+            if not all(is_number(value) for value in values):
+                raise HTTPException(400, f'Chart numeric column "{column}" must contain finite numeric values or nulls.')
+        y_values = [row.get(config.y_column) for row in data if row.get(config.y_column) is not None]
+        if config.chart_type in {"pie", "donut"} and any(value < 0 for value in y_values):
+            raise HTTPException(400, "Pie and donut charts cannot display negative values.")
+        series_keys: set[str] = set()
+        pairs: set[str] = set()
+        for row in data:
+            if isinstance(row.get(config.x_column), (dict, list)):
+                raise HTTPException(400, "Chart labels must be scalar values, not nested objects or arrays.")
+            if config.series_column and config.chart_type not in {"pie", "donut"}:
+                value = row.get(config.series_column)
+                if isinstance(value, (dict, list)):
+                    raise HTTPException(400, "Chart series must be scalar values.")
+                series_key = json.dumps([type(value).__name__, value], ensure_ascii=False)
+                series_keys.add(series_key)
+                if len(series_keys) > 12:
+                    raise HTTPException(400, "Chart supports at most 12 series. Limit or aggregate series in your SQL query.")
+                pair = json.dumps([type(row.get(config.x_column)).__name__, row.get(config.x_column), series_key], ensure_ascii=False)
+                if config.chart_type != "scatter" and pair in pairs:
+                    raise HTTPException(400, "Multiple rows have the same category and series. Aggregate the query with GROUP BY first.")
+                pairs.add(pair)
 
         return DashboardWidgetVisualization(
             kind=config.chart_type,
+            options=config.model_dump(mode="json", exclude_none=True),
             x_column=config.x_column,
             y_column=config.y_column,
             series_column=config.series_column,
@@ -482,7 +512,7 @@ def build_widget_visualization(
 
 
 def is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def raise_for_failed_widget_execution(

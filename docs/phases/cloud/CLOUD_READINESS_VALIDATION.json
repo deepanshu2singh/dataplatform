@@ -1,0 +1,49 @@
+{
+  "phase": "production-readiness-diagnostics",
+  "date": "2026-10-12",
+  "input_source_checkpoint_sha256": "fdee7dc70cf8c35e0b57a424a717d2fa6d4615511641e599c0ff05dbe1ad9a49",
+  "input_source_files_verified": 230,
+  "scope": {"modified_files": 6, "new_files": 2, "runtime_files": 3},
+  "local_python": "3.12",
+  "focused_tests": {
+    "passed": 40,
+    "warnings": 2,
+    "duration_seconds": 6.02,
+    "files": [
+      "tests/test_health.py",
+      "tests/test_health_readiness.py",
+      "tests/test_config_security.py",
+      "tests/test_observability.py",
+      "tests/test_observability_regression.py",
+      "tests/test_log_redaction.py"
+    ]
+  },
+  "production_timeout_seconds": 10,
+  "development_test_timeout_seconds": 2,
+  "new_environment_variables": [],
+  "dependency_changes": [],
+  "local_runtime_repair": {
+    "reason": "Existing scratch DuckDB native library was truncated; import crashed before tests ran.",
+    "version": "1.5.6",
+    "restored_bytes": 60489688,
+    "installed_record_hash_and_size_verified": true,
+    "shipped_dependency_changes": false
+  },
+  "live_prior_evidence": {
+    "deployment": "dataplatform-v1-np6y830mt-deepanshu1927.vercel.app",
+    "liveness_status": 200,
+    "post_migration_readiness_status": 503,
+    "post_migration_readiness_checks": {"database": "unavailable", "migrations": "unknown"},
+    "post_migration_request_id": "f38a35aa5f6b4dbbbebeb13ed623a14c",
+    "supabase_public_schema_before_migration": "empty",
+    "applied_supabase_revision": "20261011_0005",
+    "supabase_revision_independently_read": true,
+    "local_supabase_connection_seconds": 2.16,
+    "vercel_failure_cause_confirmed": false
+  },
+  "windows_apply_and_tests": "pending",
+  "hosted_patch_acceptance": "pending",
+  "powershell_executed_in_this_environment": false,
+  "frontend_tests_repeated": false,
+  "database_migrations_repeated": false
+}

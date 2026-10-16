@@ -1,3 +1,10 @@
+import { PresentationNumberInput } from '../components/dashboard/PresentationNumberInput';
+import { WidgetPresentationEditor } from '../components/dashboard/WidgetPresentationEditor';
+import { WidgetRenderer } from '../components/dashboard/WidgetRenderer';
+import type { DashboardWidget, DashboardLayout, DashboardDataSource, DashboardPosition, WidgetType, WidgetDataResponse, PresentationOptions } from '../lib/dashboardTypes';
+import { DashboardCanvas } from '../components/dashboard/DashboardCanvas';
+import { useDashboardHistory } from '../hooks/useDashboardHistory';
+import { appendWidget, boundedPosition, canvasWidgets, placeWidget, tidyWidgets, MAX_WIDGETS } from '../lib/dashboardLayout';
 import {
   useCallback,
   useEffect,
@@ -8,9 +15,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   BarChart3,
   Database,
   Edit3,
@@ -20,27 +25,19 @@ import {
   Grid3X3,
   LayoutDashboard,
   Loader2,
-  Maximize2,
+  Copy,
+  LockKeyhole,
+  LockKeyholeOpen,
+  Undo2,
+  Redo2,
+  AlignStartVertical,
   Plus,
   RefreshCw,
   Save,
   Table2,
   Trash2,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+
 
 import { api } from '../lib/api';
 import { AccessibleDialog } from '../components/AccessibleDialog';
@@ -52,38 +49,6 @@ import {
 } from '../hooks/useLatestRequest';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChanges';
 
-type WidgetType = 'chart' | 'table' | 'markdown' | 'metric';
-type ChartType = 'bar' | 'line' | 'pie' | 'donut';
-type MetricFormat = 'number' | 'currency' | 'percent' | 'text';
-
-interface DashboardPosition {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface DashboardDataSource {
-  dataset_id: number;
-  notebook_id?: number | null;
-  query: string;
-  limit: number;
-}
-
-interface DashboardWidget {
-  id: string;
-  type: WidgetType;
-  title: string;
-  config: Record<string, unknown>;
-  position: DashboardPosition;
-  source?: DashboardDataSource | null;
-}
-
-interface DashboardLayout {
-  version: 1;
-  widgets: DashboardWidget[];
-}
-
 interface ReferenceIssue {
   widget_id: string;
   reference_type: 'widget' | 'dataset' | 'notebook';
@@ -92,6 +57,7 @@ interface ReferenceIssue {
 }
 
 interface Dashboard {
+  version?: number;
   id: number;
   name: string;
   description: string | null;
@@ -108,37 +74,6 @@ interface Dataset {
   name: string;
   description: string | null;
   type: string;
-}
-
-interface WidgetVisualization {
-  kind: 'table' | 'metric' | 'bar' | 'line' | 'pie' | 'donut';
-  x_column?: string | null;
-  y_column?: string | null;
-  series_column?: string | null;
-  value_column?: string | null;
-  metric_value?: unknown;
-  format?: MetricFormat | null;
-  decimals?: number | null;
-  prefix?: string | null;
-  suffix?: string | null;
-  display_columns?: string[] | null;
-  show_legend?: boolean | null;
-}
-
-interface WidgetDataResponse {
-  dashboard_id: number | null;
-  widget_id: string;
-  widget_type: 'chart' | 'table' | 'metric';
-  dataset_id: number;
-  dataset_name: string;
-  columns: string[];
-  data: Record<string, unknown>[];
-  row_count: number;
-  dtypes: Record<string, string>;
-  truncated: boolean;
-  limit: number;
-  execution_ms: number;
-  visualization: WidgetVisualization;
 }
 
 interface WidgetRuntimeState {
@@ -229,14 +164,14 @@ function DashboardManager() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-workspace space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Dashboards
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Build private dashboards from validated SQL widgets and your own datasets.
+            A clear view of your data. Build and arrange charts from your own datasets.
           </p>
         </div>
 
@@ -280,7 +215,7 @@ function DashboardManager() {
             return (
               <article
                 key={dashboard.id}
-                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                className="dashboard-library-card p-5 transition hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -363,7 +298,10 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
   );
   const [name, setName] = useState('Untitled Dashboard');
   const [description, setDescription] = useState('');
-  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
+  const history = useDashboardHistory<DashboardWidget>();
+  const { widgets, set: setWidgets, reset: resetWidgets } = history;
+  const [locked, setLocked] = useState(false);
+  const [savedVersion, setSavedVersion] = useState<number | null>(null);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [runtime, setRuntime] = useState<Record<string, WidgetRuntimeState>>({});
@@ -471,7 +409,9 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       setDashboardNumericId(null);
       setName('Untitled Dashboard');
       setDescription('');
-      setWidgets([]);
+      resetWidgets([]);
+      setLocked(false);
+      setSavedVersion(null);
       setReferenceIssues([]);
       setEditingWidgetId(null);
       setShowAddWidget(false);
@@ -505,7 +445,9 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       setDashboardNumericId(dashboard.id);
       setName(dashboard.name);
       setDescription(dashboard.description || '');
-      setWidgets(dashboard.layout.widgets);
+      resetWidgets(canvasWidgets(dashboard.layout.widgets, dashboard.layout.version));
+      setLocked(dashboard.layout.locked ?? false);
+      setSavedVersion(dashboard.version ?? null);
       setReferenceIssues(dashboard.reference_issues);
       setDirty(false);
 
@@ -525,7 +467,7 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       }
       request.finish();
     }
-  }, [dashboardId, dashboardLoadRequest, executeSavedWidget, isNew, widgetRequests]);
+  }, [dashboardId, dashboardLoadRequest, executeSavedWidget, isNew, widgetRequests, resetWidgets]);
 
   useEffect(() => {
     void loadDatasets();
@@ -537,14 +479,43 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
     setNotice('');
   };
 
+  const changeLayout = (next: DashboardWidget[]) => {
+    if (locked || saving || JSON.stringify(next) === JSON.stringify(widgets)) return;
+    setWidgets(next);
+    markDirty();
+  };
+
   const updateWidget = (widgetId: string, nextWidget: DashboardWidget) => {
-    setWidgets((current) =>
-      current.map((widget) => (widget.id === widgetId ? nextWidget : widget)),
-    );
-    setRuntime((current) => ({
-      ...current,
-      [widgetId]: EMPTY_RUNTIME,
-    }));
+    if (saving) return;
+    const originalWidget = widgets.find(w => w.id === widgetId);
+    const dataChanged = originalWidget?.type !== nextWidget.type || JSON.stringify(originalWidget?.source) !== JSON.stringify(nextWidget.source);
+    if (dataChanged) widgetRequests.cancel(widgetId);
+    setWidgets((current) => {
+      const original = current.find(w => w.id === widgetId)!;
+      const next = current.map(w => w.id === widgetId ? { ...nextWidget, position: original.position } : w);
+      return locked ? next : placeWidget(next, widgetId, nextWidget.position);
+    });
+    if (dataChanged) setRuntime((current) => ({ ...current, [widgetId]: EMPTY_RUNTIME }));
+    markDirty();
+  };
+
+  const duplicateWidget = (widget: DashboardWidget) => {
+    if (widgets.length >= MAX_WIDGETS || locked || saving) return;
+    const duplicate = { ...structuredClone(widget), id: crypto.randomUUID(), title: `${widget.title} (copy)`.slice(0,255) };
+    const next = appendWidget(widgets, duplicate);
+    if (next === widgets) { setNotice('No free space remains. Resize or remove a widget first.'); return; }
+    changeLayout(next);
+  };
+
+  const travelHistory = (direction: 'undo' | 'redo') => {
+    if (locked || saving) return;
+    const next = direction === 'undo' ? history.previous : history.next;
+    if (!next) return;
+    const unchanged = new Set(next.filter(w => widgets.some(current => current.id === w.id && JSON.stringify(current.source) === JSON.stringify(w.source) && JSON.stringify(current.config) === JSON.stringify(w.config))).map(w => w.id));
+    for (const widget of widgets) if (!unchanged.has(widget.id)) widgetRequests.cancel(widget.id);
+    setRuntime(current => Object.fromEntries(Object.entries(current).filter(([id]) => unchanged.has(id))));
+    setEditingWidgetId(null);
+    history[direction]();
     markDirty();
   };
 
@@ -617,6 +588,7 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
   };
 
   const addWidget = (type: WidgetType) => {
+    if (widgets.length >= MAX_WIDGETS || locked || saving) return;
     const firstDatasetId = datasets[0]?.id ?? 0;
     const id = crypto.randomUUID();
 
@@ -627,19 +599,23 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       widgets.length,
     );
 
-    setWidgets((current) => [...current, widget]);
+    const next = appendWidget(widgets, widget);
+    if (next === widgets) { setNotice('No free space remains. Resize or remove a widget first.'); return; }
+    setWidgets(next);
     setShowAddWidget(false);
     setEditingWidgetId(id);
     markDirty();
   };
 
   const deleteWidget = (widget: DashboardWidget) => {
+    if (locked || saving) return;
     const confirmed = window.confirm(`Delete widget "${widget.title}"?`);
 
     if (!confirmed) {
       return;
     }
 
+    widgetRequests.cancel(widget.id);
     setWidgets((current) => current.filter((item) => item.id !== widget.id));
     setRuntime((current) => {
       const next = { ...current };
@@ -650,39 +626,6 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       setEditingWidgetId(null);
     }
     markDirty();
-  };
-
-  const moveWidget = (widgetId: string, direction: 'up' | 'down') => {
-    setWidgets((current) => {
-      const index = current.findIndex((widget) => widget.id === widgetId);
-      const target = direction === 'up' ? index - 1 : index + 1;
-
-      if (index < 0 || target < 0 || target >= current.length) {
-        return current;
-      }
-
-      const next = [...current];
-      const [moved] = next.splice(index, 1);
-
-      if (!moved) {
-        return current;
-      }
-
-      next.splice(target, 0, moved);
-      return normalizeWidgetPositions(next);
-    });
-    markDirty();
-  };
-
-  const toggleWidgetWidth = (widget: DashboardWidget) => {
-    const nextWidth = widget.position.w >= 900 ? 600 : 1200;
-    updateWidget(widget.id, {
-      ...widget,
-      position: {
-        ...widget.position,
-        w: nextWidth,
-      },
-    });
   };
 
   const saveDashboard = async () => {
@@ -697,20 +640,25 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       return;
     }
 
+    if (dashboardNumericId && savedVersion === null) {
+      setPageError('Reload this dashboard before saving so its latest version can be checked.');
+      return;
+    }
     saveInFlightRef.current = true;
     setSaving(true);
     setPageError('');
     setNotice('');
 
-    const normalizedWidgets = normalizeWidgetPositions(widgets);
     const payload = {
       name: cleanName,
       description: description.trim() || null,
       layout: {
-        version: 1 as const,
-        widgets: normalizedWidgets,
+        version: 3 as const,
+        locked,
+        widgets,
       },
       is_public: false,
+      ...(dashboardNumericId && savedVersion ? { expected_version: savedVersion } : {}),
     };
 
     try {
@@ -723,7 +671,9 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
       setDashboardNumericId(saved.id);
       setName(saved.name);
       setDescription(saved.description || '');
-      setWidgets(saved.layout.widgets);
+      resetWidgets(canvasWidgets(saved.layout.widgets, saved.layout.version));
+      setLocked(saved.layout.locked ?? false);
+      setSavedVersion(saved.version ?? null);
       setReferenceIssues(saved.reference_issues);
       setDirty(false);
       setNotice('Dashboard saved.');
@@ -757,7 +707,7 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="dashboard-workspace space-y-5" aria-busy={saving}>
       <div className="sticky top-16 z-30 -mx-4 border-b border-gray-200 bg-gray-50/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-gray-700 dark:bg-gray-900/95">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -773,6 +723,8 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
             <div className="min-w-0 flex-1">
               <input
                 value={name}
+                disabled={saving}
+                aria-label="Dashboard name"
                 maxLength={255}
                 onChange={(event) => {
                   setName(event.target.value);
@@ -783,6 +735,8 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
               />
               <input
                 value={description}
+                disabled={saving}
+                aria-label="Dashboard description"
                 maxLength={5000}
                 onChange={(event) => {
                   setDescription(event.target.value);
@@ -822,6 +776,7 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
             <button
               type="button"
               onClick={() => setShowAddWidget(true)}
+              disabled={locked || saving || widgets.length >= MAX_WIDGETS}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
               <Plus className="h-4 w-4" />
@@ -842,6 +797,17 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="dashboard-toolbar" role="toolbar" aria-label="Dashboard layout">
+        <div className="dashboard-toolbar-heading"><span className="dashboard-eyebrow">WORKSPACE / CANVAS</span><strong>{widgets.length} / {MAX_WIDGETS} widgets</strong><span>12-column grid · changes stay in your draft until Save</span></div>
+        <div className="dashboard-toolbar-actions">
+          <button type="button" onClick={() => { setLocked(!locked); markDirty(); }} disabled={saving} aria-pressed={locked}>{locked ? <LockKeyhole size={16}/> : <LockKeyholeOpen size={16}/>} {locked ? 'Unlock layout' : 'Lock layout'}</button>
+          <button type="button" aria-label="Undo layout" disabled={locked || saving || !history.canUndo} onClick={() => travelHistory('undo')}><Undo2 size={16}/>Undo</button>
+          <button type="button" aria-label="Redo layout" disabled={locked || saving || !history.canRedo} onClick={() => travelHistory('redo')}><Redo2 size={16}/>Redo</button>
+          <button type="button" disabled={locked || saving || !widgets.length} onClick={() => changeLayout(tidyWidgets(widgets))}><AlignStartVertical size={16}/>Tidy layout</button>
+        </div>
+        <p className="dashboard-toolbar-help">{locked ? 'Placement is locked. You can still edit content and refresh data.' : 'Drag a handle to move. Pull the bottom corner to resize. For exact sizes, open Edit widget → Placement.'}</p>
       </div>
 
       {pageError && <ErrorBanner message={pageError} />}
@@ -879,38 +845,34 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
             Your dashboard is empty
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-            Add a table, metric, chart, or Markdown widget. Data widgets execute through the validated dashboard SQL endpoint.
+            Start with a metric, a chart, a table, or a note. Arrange your findings into a clear story.
           </p>
           <button
             type="button"
             onClick={() => setShowAddWidget(true)}
+            disabled={locked || saving}
             className="mt-6 rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white hover:bg-blue-700"
           >
             Add First Widget
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          {widgets.map((widget, index) => (
-            <WidgetCard
-              key={widget.id}
-              widget={widget}
-              runtime={runtime[widget.id] ?? EMPTY_RUNTIME}
-              referenceIssue={referenceIssues.find(
-                (issue) => issue.widget_id === widget.id,
-              )}
-              fullWidth={widget.position.w >= 900}
-              canMoveUp={index > 0}
-              canMoveDown={index < widgets.length - 1}
-              onEdit={() => setEditingWidgetId(widget.id)}
-              onDelete={() => deleteWidget(widget)}
-              onRefresh={() => void refreshWidget(widget)}
-              onMoveUp={() => moveWidget(widget.id, 'up')}
-              onMoveDown={() => moveWidget(widget.id, 'down')}
-              onToggleWidth={() => toggleWidgetWidth(widget)}
-            />
-          ))}
-        </div>
+        <DashboardCanvas
+          widgets={widgets}
+          locked={locked || saving}
+          onChange={changeLayout}
+          renderWidget={(widget) => <WidgetCard
+            widget={widget}
+            runtime={runtime[widget.id] ?? EMPTY_RUNTIME}
+            referenceIssue={referenceIssues.find(issue => issue.widget_id === widget.id)}
+            onEdit={() => setEditingWidgetId(widget.id)}
+            onDelete={() => deleteWidget(widget)}
+            onRefresh={() => void refreshWidget(widget)}
+            onDuplicate={() => duplicateWidget(widget)}
+            placementDisabled={locked || saving}
+            duplicateDisabled={widgets.length >= MAX_WIDGETS}
+          />}
+        />
       )}
 
       {showAddWidget && (
@@ -920,9 +882,10 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
         />
       )}
 
-      {selectedWidget && (
+      {selectedWidget && !saving && (
         <WidgetEditorModal
           widget={selectedWidget}
+          placementLocked={locked}
           datasets={datasets}
           runtime={runtime[selectedWidget.id] ?? EMPTY_RUNTIME}
           onChange={(nextWidget) => updateWidget(selectedWidget.id, nextWidget)}
@@ -934,83 +897,27 @@ function DashboardBuilder({ dashboardId }: { dashboardId: string }) {
   );
 }
 
-function WidgetCard({
-  widget,
-  runtime,
-  referenceIssue,
-  fullWidth,
-  canMoveUp,
-  canMoveDown,
-  onEdit,
-  onDelete,
-  onRefresh,
-  onMoveUp,
-  onMoveDown,
-  onToggleWidth,
-}: {
-  widget: DashboardWidget;
-  runtime: WidgetRuntimeState;
-  referenceIssue?: ReferenceIssue;
-  fullWidth: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onRefresh: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onToggleWidth: () => void;
+function WidgetCard({widget,runtime,referenceIssue,onEdit,onDelete,onRefresh,onDuplicate,placementDisabled,duplicateDisabled}: {
+  widget:DashboardWidget;runtime:WidgetRuntimeState;referenceIssue?:ReferenceIssue;
+  onEdit:()=>void;onDelete:()=>void;onRefresh:()=>void;onDuplicate:()=>void;placementDisabled:boolean;duplicateDisabled:boolean;
 }) {
-  const height = Math.max(240, Math.min(widget.position.h, 620));
-
-  return (
-    <article
-      className={`${fullWidth ? 'xl:col-span-2' : ''} overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800`}
-    >
-      <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-        <div className="flex min-w-0 items-center gap-2">
-          <WidgetTypeIcon type={widget.type} />
-          <div className="min-w-0">
-            <h3 className="truncate font-semibold text-gray-900 dark:text-white">
-              {widget.title}
-            </h3>
-            <p className="text-xs capitalize text-gray-500 dark:text-gray-400">
-              {widget.type}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {widget.type !== 'markdown' && (
-            <IconButton label="Refresh widget" onClick={onRefresh}>
-              <RefreshCw className={`h-4 w-4 ${runtime.loading ? 'animate-spin' : ''}`} />
-            </IconButton>
-          )}
-          <IconButton label="Move widget up" onClick={onMoveUp} disabled={!canMoveUp}>
-            <ArrowUp className="h-4 w-4" />
-          </IconButton>
-          <IconButton label="Move widget down" onClick={onMoveDown} disabled={!canMoveDown}>
-            <ArrowDown className="h-4 w-4" />
-          </IconButton>
-          <IconButton label="Toggle widget width" onClick={onToggleWidth}>
-            <Maximize2 className="h-4 w-4" />
-          </IconButton>
-          <IconButton label="Edit widget" onClick={onEdit}>
-            <Edit3 className="h-4 w-4" />
-          </IconButton>
-          <IconButton label="Delete widget" onClick={onDelete} danger>
-            <Trash2 className="h-4 w-4" />
-          </IconButton>
+  return ( <article className="dashboard-card">
+      <header className="dashboard-card-header">
+        <div className="flex min-w-0 items-center gap-2"><WidgetTypeIcon type={widget.type}/><div className="min-w-0"><h3 className="truncate font-semibold">{widget.title}</h3><p className="dashboard-eyebrow">{widget.type}</p></div></div>
+        <div className="flex shrink-0 items-center gap-1">
+          {widget.type !== 'markdown' && <IconButton label="Refresh widget" onClick={onRefresh}><RefreshCw className={`h-4 w-4 ${runtime.loading ? 'animate-spin' : ''}`}/></IconButton>}
+          <IconButton label="Duplicate widget" onClick={onDuplicate} disabled={placementDisabled || duplicateDisabled}><Copy className="h-4 w-4"/></IconButton>
+          <IconButton label="Edit widget" onClick={onEdit}><Edit3 className="h-4 w-4"/></IconButton>
+          <IconButton label="Delete widget" onClick={onDelete} disabled={placementDisabled} danger><Trash2 className="h-4 w-4"/></IconButton>
         </div>
       </header>
-
       {referenceIssue && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
           {referenceIssue.message}
         </div>
       )}
 
-      <div className="p-4" style={{ minHeight: height }}>
+      <div className="dashboard-card-body">
         {widget.type === 'markdown' ? (
           <SafeMarkdown text={String(widget.config.markdown ?? '')} />
         ) : runtime.loading ? (
@@ -1026,7 +933,7 @@ function WidgetCard({
             </div>
           </div>
         ) : runtime.data ? (
-          <WidgetRenderer response={runtime.data} />
+          <WidgetRenderer response={runtime.data} config={widget.config as PresentationOptions} widgetType={widget.type}/>
         ) : (
           <div className="flex h-full min-h-52 flex-col items-center justify-center text-center text-sm text-gray-500 dark:text-gray-400">
             <Database className="mb-3 h-9 w-9 text-gray-300 dark:text-gray-600" />
@@ -1058,190 +965,9 @@ function WidgetCard({
   );
 }
 
-function WidgetRenderer({ response }: { response: WidgetDataResponse }) {
-  const visualization = response.visualization;
-
-  if (visualization.kind === 'table') {
-    const columns = visualization.display_columns?.length
-      ? visualization.display_columns
-      : response.columns;
-
-    return <DataTable columns={columns} rows={response.data} />;
-  }
-
-  if (visualization.kind === 'metric') {
-    return (
-      <MetricCard
-        value={visualization.metric_value}
-        format={visualization.format ?? 'number'}
-        decimals={visualization.decimals ?? 2}
-        prefix={visualization.prefix ?? ''}
-        suffix={visualization.suffix ?? ''}
-      />
-    );
-  }
-
-  return <DataChart response={response} />;
-}
-
-function DataTable({
-  columns,
-  rows,
-}: {
-  columns: string[];
-  rows: Record<string, unknown>[];
-}) {
-  if (rows.length === 0) {
-    return <EmptyDataState message="Query returned no rows." />;
-  }
-
-  return (
-    <div className="max-h-[520px] overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
-      <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
-        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
-          <tr>
-            {columns.map((column) => (
-              <th
-                key={column}
-                className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              >
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-800">
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {columns.map((column) => (
-                <td
-                  key={`${rowIndex}-${column}`}
-                  className="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300"
-                >
-                  {formatCellValue(row[column])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function MetricCard({
-  value,
-  format,
-  decimals,
-  prefix,
-  suffix,
-}: {
-  value: unknown;
-  format: MetricFormat;
-  decimals: number;
-  prefix: string;
-  suffix: string;
-}) {
-  return (
-    <div className="flex min-h-52 items-center justify-center">
-      <div className="text-center">
-        <p className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
-          {formatMetricValue(value, format, decimals, prefix, suffix)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function DataChart({ response }: { response: WidgetDataResponse }) {
-  const visualization = response.visualization;
-  const xColumn = visualization.x_column;
-  const yColumn = visualization.y_column;
-
-  if (!xColumn || !yColumn) {
-    return <EmptyDataState message="Chart configuration is incomplete." />;
-  }
-
-  if (response.data.length === 0) {
-    return <EmptyDataState message="Query returned no chart points." />;
-  }
-
-  if (visualization.kind === 'pie' || visualization.kind === 'donut') {
-    return (
-      <div className="h-[340px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            <Pie
-              data={response.data}
-              dataKey={yColumn}
-              nameKey={xColumn}
-              cx="50%"
-              cy="50%"
-              outerRadius="78%"
-              innerRadius={visualization.kind === 'donut' ? '48%' : 0}
-              fill="currentColor"
-              className="text-blue-600"
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  const series = prepareSeriesChartData(
-    response.data,
-    xColumn,
-    yColumn,
-    visualization.series_column ?? null,
-  );
-
-  return (
-    <div className="h-[340px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        {visualization.kind === 'line' ? (
-          <LineChart data={series.rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={xColumn} />
-            <YAxis />
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            {series.keys.map((key) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke="currentColor"
-                className="text-blue-600"
-                dot={false}
-              />
-            ))}
-          </LineChart>
-        ) : (
-          <BarChart data={series.rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={xColumn} />
-            <YAxis />
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            {series.keys.map((key) => (
-              <Bar
-                key={key}
-                dataKey={key}
-                fill="currentColor"
-                className="text-blue-600"
-              />
-            ))}
-          </BarChart>
-        )}
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function WidgetEditorModal({
   widget,
+  placementLocked,
   datasets,
   runtime,
   onChange,
@@ -1249,6 +975,7 @@ function WidgetEditorModal({
   onClose,
 }: {
   widget: DashboardWidget;
+  placementLocked: boolean;
   datasets: Dataset[];
   runtime: WidgetRuntimeState;
   onChange: (widget: DashboardWidget) => void;
@@ -1257,15 +984,7 @@ function WidgetEditorModal({
 }) {
   const setTitle = (title: string) => onChange({ ...widget, title });
 
-  const setConfigValue = (key: string, value: unknown) => {
-    onChange({
-      ...widget,
-      config: {
-        ...widget.config,
-        [key]: value,
-      },
-    });
-  };
+  const setConfigValue = (key:string,value:unknown) => onChange({...widget,config:{...widget.config,[key]:value}});
 
   const setSourceValue = (key: keyof DashboardDataSource, value: unknown) => {
     const currentSource = widget.source ?? {
@@ -1286,7 +1005,7 @@ function WidgetEditorModal({
   return (
     <AccessibleDialog
       title={`Edit ${capitalize(widget.type)} Widget`}
-      description="Preview uses the Phase 7B execution endpoint before you save."
+      description="Preview your widget before saving."
       onClose={onClose}
       closeLabel="Close widget editor"
       panelClassName="max-h-[92vh] max-w-3xl overflow-hidden rounded-2xl"
@@ -1365,17 +1084,7 @@ function WidgetEditorModal({
                   />
                 </Field>
 
-                {widget.type === 'chart' && (
-                  <ChartConfigEditor widget={widget} onChange={setConfigValue} />
-                )}
-
-                {widget.type === 'metric' && (
-                  <MetricConfigEditor widget={widget} onChange={setConfigValue} />
-                )}
-
-                {widget.type === 'table' && (
-                  <TableConfigEditor widget={widget} onChange={setConfigValue} />
-                )}
+                <WidgetPresentationEditor widget={widget} onChange={config=>onChange({...widget,config})} resultColumns={runtime.data?.columns??[]}/>
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -1384,7 +1093,7 @@ function WidgetEditorModal({
                         Widget preview
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Preview results are temporary and are not stored in the dashboard.
+                        Style changes use the current result. Preview validates your selected fields; Save keeps the settings.
                       </p>
                     </div>
                     <button
@@ -1405,8 +1114,8 @@ function WidgetEditorModal({
                   {runtime.error ? (
                     <ErrorBanner message={runtime.error} compact />
                   ) : runtime.data ? (
-                    <div className="max-h-[360px] overflow-auto rounded-lg bg-white p-3 dark:bg-gray-800">
-                      <WidgetRenderer response={runtime.data} />
+                    <div className="max-h-[360px] overflow-auto rounded-lg bg-white p-3 dark:bg-gray-800" style={widget.type==='chart'?{height:360}:undefined}>
+                      <WidgetRenderer response={runtime.data} config={widget.config as PresentationOptions} widgetType={widget.type}/>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -1417,46 +1126,13 @@ function WidgetEditorModal({
               </>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Width">
-                <select
-                  value={widget.position.w >= 900 ? 'full' : 'half'}
-                  onChange={(event) =>
-                    onChange({
-                      ...widget,
-                      position: {
-                        ...widget.position,
-                        w: event.target.value === 'full' ? 1200 : 600,
-                      },
-                    })
-                  }
-                  className={inputClassName}
-                >
-                  <option value="half">Half width</option>
-                  <option value="full">Full width</option>
-                </select>
-              </Field>
-
-              <Field label="Height">
-                <select
-                  value={nearestHeightPreset(widget.position.h)}
-                  onChange={(event) =>
-                    onChange({
-                      ...widget,
-                      position: {
-                        ...widget.position,
-                        h: Number(event.target.value),
-                      },
-                    })
-                  }
-                  className={inputClassName}
-                >
-                  <option value="260">Compact</option>
-                  <option value="360">Standard</option>
-                  <option value="520">Tall</option>
-                </select>
-              </Field>
-            </div>
+            <fieldset disabled={placementLocked} className="space-y-3">
+              <legend className="text-sm font-semibold">Placement</legend>
+              <p className="text-xs text-gray-500">{placementLocked ? 'Unlock the layout to change placement.' : 'Columns and rows start at 1. Overlapping cards move down automatically.'}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {([['x','Column',1,13-widget.position.w],['y','Row',1,1001-widget.position.h],['w','Width (columns)',3,12],['h','Height (rows)',5,40]] as const).map(([key,label,min,max])=><Field key={key} label={label}><PresentationNumberInput aria-label={label} min={min} max={max} value={widget.position[key] + (key==='x'||key==='y'?1:0)} onCommit={number=>{if(number===null)return;const value=number-(key==='x'||key==='y'?1:0);onChange({...widget,position:boundedPosition({...widget.position,[key]:value})});}} className={inputClassName}/></Field>)}
+              </div>
+            </fieldset>
           </div>
         </div>
 
@@ -1470,166 +1146,6 @@ function WidgetEditorModal({
           </button>
         </div>
     </AccessibleDialog>
-  );
-}
-
-function ChartConfigEditor({
-  widget,
-  onChange,
-}: {
-  widget: DashboardWidget;
-  onChange: (key: string, value: unknown) => void;
-}) {
-  return (
-    <div className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-2 dark:border-gray-700">
-      <Field label="Chart type">
-        <select
-          value={String(widget.config.chart_type ?? 'bar')}
-          onChange={(event) => onChange('chart_type', event.target.value as ChartType)}
-          className={inputClassName}
-        >
-          <option value="bar">Bar</option>
-          <option value="line">Line</option>
-          <option value="pie">Pie</option>
-          <option value="donut">Donut</option>
-        </select>
-      </Field>
-      <Field label="X / category column">
-        <input
-          value={String(widget.config.x_column ?? '')}
-          onChange={(event) => onChange('x_column', event.target.value)}
-          className={inputClassName}
-          placeholder="product"
-        />
-      </Field>
-      <Field label="Y / numeric column">
-        <input
-          value={String(widget.config.y_column ?? '')}
-          onChange={(event) => onChange('y_column', event.target.value)}
-          className={inputClassName}
-          placeholder="total_revenue"
-        />
-      </Field>
-      <Field label="Series column (optional)">
-        <input
-          value={String(widget.config.series_column ?? '')}
-          onChange={(event) =>
-            onChange('series_column', event.target.value.trim() || null)
-          }
-          className={inputClassName}
-          placeholder="region"
-        />
-      </Field>
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
-        <input
-          type="checkbox"
-          checked={widget.config.show_legend !== false}
-          onChange={(event) => onChange('show_legend', event.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-        Show legend
-      </label>
-    </div>
-  );
-}
-
-function MetricConfigEditor({
-  widget,
-  onChange,
-}: {
-  widget: DashboardWidget;
-  onChange: (key: string, value: unknown) => void;
-}) {
-  return (
-    <div className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-2 dark:border-gray-700">
-      <Field label="Value column">
-        <input
-          value={String(widget.config.value_column ?? '')}
-          onChange={(event) => onChange('value_column', event.target.value)}
-          className={inputClassName}
-          placeholder="total_revenue"
-        />
-      </Field>
-      <Field label="Format">
-        <select
-          value={String(widget.config.format ?? 'number')}
-          onChange={(event) => onChange('format', event.target.value as MetricFormat)}
-          className={inputClassName}
-        >
-          <option value="number">Number</option>
-          <option value="currency">Currency</option>
-          <option value="percent">Percent</option>
-          <option value="text">Text</option>
-        </select>
-      </Field>
-      <Field label="Decimals">
-        <input
-          type="number"
-          min={0}
-          max={6}
-          value={Number(widget.config.decimals ?? 2)}
-          onChange={(event) =>
-            onChange('decimals', clampNumber(Number(event.target.value), 0, 6))
-          }
-          className={inputClassName}
-        />
-      </Field>
-      <Field label="Label (optional)">
-        <input
-          value={String(widget.config.label ?? '')}
-          onChange={(event) => onChange('label', event.target.value.trim() || null)}
-          className={inputClassName}
-          placeholder="Total Revenue"
-        />
-      </Field>
-      <Field label="Prefix (optional)">
-        <input
-          value={String(widget.config.prefix ?? '')}
-          maxLength={32}
-          onChange={(event) => onChange('prefix', event.target.value || null)}
-          className={inputClassName}
-          placeholder="£"
-        />
-      </Field>
-      <Field label="Suffix (optional)">
-        <input
-          value={String(widget.config.suffix ?? '')}
-          maxLength={32}
-          onChange={(event) => onChange('suffix', event.target.value || null)}
-          className={inputClassName}
-          placeholder="%"
-        />
-      </Field>
-    </div>
-  );
-}
-
-function TableConfigEditor({
-  widget,
-  onChange,
-}: {
-  widget: DashboardWidget;
-  onChange: (key: string, value: unknown) => void;
-}) {
-  const columns = Array.isArray(widget.config.columns)
-    ? (widget.config.columns as string[]).join(', ')
-    : '';
-
-  return (
-    <Field label="Displayed columns (optional, comma separated)">
-      <input
-        value={columns}
-        onChange={(event) => {
-          const nextColumns = event.target.value
-            .split(',')
-            .map((column) => column.trim())
-            .filter(Boolean);
-          onChange('columns', nextColumns.length ? nextColumns : null);
-        }}
-        className={inputClassName}
-        placeholder="product, total_revenue"
-      />
-    </Field>
   );
 }
 
@@ -1661,7 +1177,7 @@ function AddWidgetModal({
     {
       type: 'chart',
       title: 'Chart',
-      description: 'Bar, line, pie, or donut visualization.',
+      description: 'Choose from 10 chart types, including stacked, scatter, and combo charts.',
       icon: BarChart3,
     },
     {
@@ -1901,9 +1417,9 @@ function createDefaultWidget(
 ): DashboardWidget {
   const position: DashboardPosition = {
     x: 0,
-    y: index * 380,
-    w: type === 'metric' ? 600 : 1200,
-    h: type === 'metric' ? 260 : 360,
+    y: index * 10,
+    w: type === 'metric' ? 4 : 6,
+    h: type === 'metric' ? 6 : 10,
   };
 
   if (type === 'markdown') {
@@ -1972,94 +1488,6 @@ function createDefaultWidget(
   };
 }
 
-function normalizeWidgetPositions(widgets: DashboardWidget[]): DashboardWidget[] {
-  return widgets.map((widget, index) => ({
-    ...widget,
-    position: {
-      ...widget.position,
-      x: 0,
-      y: index * 380,
-    },
-  }));
-}
-
-function prepareSeriesChartData(
-  data: Record<string, unknown>[],
-  xColumn: string,
-  yColumn: string,
-  seriesColumn: string | null,
-): { rows: Record<string, unknown>[]; keys: string[] } {
-  if (!seriesColumn) {
-    return {
-      rows: data,
-      keys: [yColumn],
-    };
-  }
-
-  const rowMap = new Map<string, Record<string, unknown>>();
-  const keys: string[] = [];
-
-  for (const row of data) {
-    const xValue = row[xColumn];
-    const seriesValue = String(row[seriesColumn] ?? 'Series');
-    const mapKey = String(xValue ?? '');
-
-    if (!keys.includes(seriesValue)) {
-      keys.push(seriesValue);
-    }
-
-    const current = rowMap.get(mapKey) ?? { [xColumn]: xValue };
-    current[seriesValue] = row[yColumn];
-    rowMap.set(mapKey, current);
-  }
-
-  return {
-    rows: Array.from(rowMap.values()),
-    keys,
-  };
-}
-
-function formatMetricValue(
-  value: unknown,
-  format: MetricFormat,
-  decimals: number,
-  prefix: string,
-  suffix: string,
-): string {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  if (format === 'text' || typeof value !== 'number') {
-    return `${prefix}${String(value)}${suffix}`;
-  }
-
-  const formatted = new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-
-  const percentSuffix = format === 'percent' && !suffix ? '%' : suffix;
-  return `${prefix}${formatted}${percentSuffix}`;
-}
-
-function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-
-  return String(value);
-}
-
-
 function formatDateTime(value: string): string {
   const date = new Date(value);
 
@@ -2081,12 +1509,6 @@ function clampNumber(value: number, min: number, max: number): number {
     return min;
   }
   return Math.min(max, Math.max(min, value));
-}
-
-function nearestHeightPreset(value: number): string {
-  if (value < 310) return '260';
-  if (value > 440) return '520';
-  return '360';
 }
 
 function capitalize(value: string): string {

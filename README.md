@@ -1,87 +1,87 @@
-# DataPlatform — Clean V1
+# DataPlatform
 
-A local-first analytics platform prototype with authentication, dataset uploads, DuckDB SQL, notebooks, and dashboard scaffolding.
+A full-stack analytics workspace for private CSV datasets, SQL queries, saved notebooks, browser-based Python analysis, and interactive dashboards.
 
-## Current V1 scope
+## Hosted application
 
-Working toward this verified flow:
+- App: https://dataplatform.sprout-sql.com
+- Vercel alias: https://dataplatform-v1.vercel.app
+- Vercel hosts the React/Vite frontend and FastAPI backend, configured by `vercel.json`.
+- Supabase provides PostgreSQL and the private `datasets` Storage bucket. The hosted upload cap is 50,000,000 bytes.
+- Authentication belongs to this FastAPI application. Using Supabase for its database and storage does not make this a Supabase Auth application.
+- The frontend uses the same-origin `/api/v1` API. Private uploads transfer directly to Supabase through signed, resumable TUS requests.
+- Notebook Python runs in a browser worker using the self-hosted Pyodide assets in `frontend/public/pyodide/314.0.7/`. Python is not executed inside the API process.
 
-1. Register/login
-2. Upload a dataset
-3. Inspect dataset metadata
-4. Create and save a notebook
-5. Run SQL against the selected dataset
-6. Reopen saved work
-7. Persist dashboard layouts/widgets
-8. Add isolated Python execution
+Docker Desktop is needed for local container development, tests and container-based migration commands. It does not need to remain open to serve the hosted application.
 
-Python execution is **disabled by default** until it is moved out of the API container into an isolated execution environment.
+## Features and current validation
 
-## Stack
+- Register/login/logout with backend-owned sessions and ownership checks.
+- Durable dataset upload intents, private storage, dataset preview and SQL execution through DuckDB.
+- Saved SQL/Python notebooks and bounded browser dataset snapshots.
+- Dashboard builder/viewer with movable and resizable widgets, duplicate, undo/redo, locking and optimistic conflict handling.
+- Bar, horizontal bar, line, area, stacked bar, stacked area, pie, donut, scatter and combo charts; table/metric presentation controls; column selectors populated from query-result fields.
+- Light/dark themes and responsive layouts.
 
-- Backend: FastAPI + SQLAlchemy + PostgreSQL
-- SQL engine: DuckDB
-- Frontend: React + TypeScript + Vite
-- Orchestration: Docker Compose with explicit root development, test, and production entrypoints
+The latest supplied deployment health responses are HTTP 200 for both `/health/live` and `/health/ready`, with database and migration checks OK. Historical phase documents retain their original evidence. See [the current synchronization status](docs/phases/cloud/CLOUD_GITHUB_SYNC_STATUS.md) for what has and has not been accepted live.
 
-## Canonical Docker Compose entrypoints
+Connected server-side filters/slicers and email ownership verification are planned work; they are not claimed as implemented features.
 
-Run Compose commands from the repository root only. The supported entrypoints are:
+## Cloud setup and deployment
 
-- Development: `docker-compose.yml`
-- Tests: `docker-compose.test.yml`
-- Production: `docker-compose.prod.yml` with `production.env`
-
-Do not add or invoke nested Compose files under `backend/` or `frontend/`.
-
-Production startup:
+1. Read [the cloud deployment runbook](docs/CLOUD_DEPLOYMENT_RUNBOOK.md) and [dataset integration runbook](docs/phases/cloud/CLOUD_INTEGRATION_RUNBOOK.md).
+2. Configure backend secrets in the hosting environment using the placeholders in `backend/.env.cloud.example`. Set the frontend build variable `VITE_API_URL=/api/v1`.
+3. Apply database migrations deliberately using the runbook. Deployment does not automatically migrate a database.
+4. Deploy from the repository root using the existing Vercel project:
 
 ```powershell
-docker compose --env-file .\production.env -f .\docker-compose.prod.yml up -d
+npx.cmd --yes vercel@63.1.2 deploy --prod --scope deepanshu1927
 ```
 
-The current HTTPS/Caddy edge remains managed separately from the production Compose stack.
+The Vercel CLI deploys local source. Saving changes on GitHub requires a separate Git commit and push. Automatic Git deployments were not enabled during the recorded setup.
 
-## Quick start — Windows / Docker Desktop
+Do not commit real environment files, passwords, API keys, session tokens or uploaded datasets. The committed `.example` configuration files contain placeholders only.
+
+## Local development and tests
+
+Supported Compose entrypoints, run from the repository root:
+
+- `docker-compose.yml`: local development.
+- `docker-compose.test.yml`: isolated tests with a disposable test database.
+- `docker-compose.prod.yml` plus a private `production.env`: the separate container-hosted topology.
+
+The Compose production topology is an alternative to the currently hosted Vercel/Supabase deployment. Do not run migration commands against the hosted database as part of routine tests.
+
+For local development, copy `.env.example` to `.env`, replace the development secret with a generated value, and run:
 
 ```powershell
-Copy-Item .env.example .env
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-Paste the generated value into `.env` as `SECRET_KEY=...`, then:
-
-```powershell
-docker compose build --no-cache
+docker compose build
 docker compose up
 ```
 
-Open:
+Local app: http://localhost:5173. Local backend: http://localhost:8000.
 
-- App: http://localhost:5173
-- Backend health: http://localhost:8000/health
-- Swagger UI: http://localhost:8000/docs
-- OpenAPI JSON: http://localhost:8000/api/v1/openapi.json
+Frontend tests and lint:
 
-## Project structure
-
-```text
-backend/
-  app/
-    api/routes/
-    core/
-    db/
-    models/
-    schemas/
-    services/
-frontend/
-  src/
-docker-compose.yml       # development
-docker-compose.test.yml  # tests
-docker-compose.prod.yml  # production
-V1_REPAIR_GUIDE.md
+```powershell
+npm.cmd --prefix .\frontend test -- --maxWorkers=2 --testTimeout=15000
+npm.cmd --prefix .\frontend run lint
 ```
 
-## Safety
+The cloud build wrapper is `frontend/scripts/build-vercel.mjs`; it builds and verifies the same-origin API configuration, editor sanitizer and shipped browser Python assets. `frontend/build/editorSanitizer.ts` is required build source, not generated output.
 
-Use `docker-compose.yml` only for local development and `docker-compose.test.yml` only for isolated tests. Production deployments use `docker-compose.prod.yml` with the production environment file and the accepted hardening controls. Python execution remains disabled by default until it is moved into an isolated execution environment.
+Dashboard verification helpers live in `scripts/verify-cloud-dashboard-presentation.ps1` and `scripts/verify-cloud-dashboard-column-selectors.ps1`. Use their runbooks and isolated test configuration rather than the hosted database.
+
+## Source layout
+
+| Path | Purpose |
+| --- | --- |
+| `backend/app` | API routes, authentication, configuration, data/storage services and database models |
+| `backend/alembic` | Versioned database migrations |
+| `backend/tests` | Backend unit and database integration tests |
+| `frontend/src` | Application, notebooks, dashboard builder and shared viewer rendering |
+| `frontend/build` | Source for build-time editor sanitization checks |
+| `frontend/public` | Static assets and self-hosted browser Python runtime |
+| `frontend/scripts` | Cloud build wrapper |
+| `scripts` | Verification and local operational helpers |
+| `docs` | Deployment runbooks, phase scope and historical validation evidence |

@@ -42,6 +42,7 @@ const TABLE_WIDGET = {
 };
 
 const DASHBOARD = {
+  version: 1,
   id: 2,
   name: 'Sales Dashboard',
   description: 'Revenue reporting',
@@ -270,7 +271,7 @@ describe('DashboardsPage', () => {
     );
   });
 
-  it('saves an existing dashboard as private with normalized layout positions', async () => {
+  it('saves an existing dashboard as private with a versioned canvas layout', async () => {
     mockBuilderGets();
     vi.spyOn(api, 'post').mockResolvedValue({ data: TABLE_RESULT });
     const putSpy = vi.spyOn(api, 'put').mockResolvedValue({
@@ -301,7 +302,7 @@ describe('DashboardsPage', () => {
     expect(payload.name).toBe('Renamed Dashboard');
     expect(payload.description).toBe('Updated description');
     expect(payload.is_public).toBe(false);
-    expect(payload.layout.version).toBe(1);
+    expect(payload.layout.version).toBe(3);
     expect(payload.layout.widgets[0].position).toMatchObject({ x: 0, y: 0 });
     expect(await screen.findByText('Dashboard saved.')).toBeInTheDocument();
   });
@@ -367,4 +368,39 @@ describe('DashboardsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Back to dashboards' }));
     expect(await screen.findByText('Dashboard list destination')).toBeInTheDocument();
   });
+  it('retains duplicate IDs and placement across undo/redo and explicit Save without extra SQL', async () => {
+    mockBuilderGets();
+    const post=vi.spyOn(api,'post').mockResolvedValue({data:TABLE_RESULT});
+    const put=vi.spyOn(api,'put').mockImplementation(async (_url,payload) => ({data:{...DASHBOARD,...(payload as object),version:2}}) as never);
+    const user=userEvent.setup();renderBuilder();
+    await screen.findByText('Laptop');
+    await user.click(screen.getByRole('button',{name:'Duplicate widget'}));
+    const copy=screen.getByRole('region',{name:'Sales Table (copy) widget'});
+    const id=copy.getAttribute('data-widget-id');
+    expect(id).not.toBe(TABLE_WIDGET.id);
+    await user.click(screen.getByRole('button',{name:'Undo layout'}));
+    expect(screen.queryByRole('region',{name:'Sales Table (copy) widget'})).toBeNull();
+    expect(screen.getByText('Laptop')).toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:'Redo layout'}));
+    expect(screen.getByRole('region',{name:'Sales Table (copy) widget'})).toHaveAttribute('data-widget-id',id);
+    expect(post).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button',{name:'Save'}));
+    const payload=put.mock.calls[0][1] as any;
+    expect(payload.expected_version).toBe(1);
+    expect(payload.layout.widgets[1].id).toBe(id);
+    expect(payload.layout.widgets[1].position.y).toBe(10);
+  });
+
+  it('preserves the draft when a stale Save is refused', async () => {
+    mockBuilderGets();vi.spyOn(api,'post').mockResolvedValue({data:TABLE_RESULT});
+    vi.spyOn(api,'put').mockRejectedValue({response:{data:{detail:'Dashboard changed in another tab. Reload before saving.'}}});
+    const user=userEvent.setup();renderBuilder();
+    const name=await screen.findByDisplayValue('Sales Dashboard');
+    await user.clear(name);await user.type(name,'My unsaved analysis');
+    await user.click(screen.getByRole('button',{name:'Save'}));
+    expect(await screen.findByText('Dashboard changed in another tab. Reload before saving.')).toBeInTheDocument();
+    expect(name).toHaveValue('My unsaved analysis');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
 });

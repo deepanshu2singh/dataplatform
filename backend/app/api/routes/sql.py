@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Any
 
@@ -28,6 +27,8 @@ from app.services.sql_executor import (
     SQLValidationError,
     sql_executor,
 )
+from app.services.dataset_execution import execute_dataset_sql
+from app.services.dataset_files import DatasetFileError
 
 
 router = APIRouter()
@@ -123,10 +124,9 @@ async def execute_sql(
     )
 
     try:
-        result = await asyncio.to_thread(
-            sql_executor.execute,
+        result = await execute_dataset_sql(
+            dataset,
             request.query,
-            dataset.config,
             request.limit,
         )
 
@@ -147,6 +147,8 @@ async def execute_sql(
             result
         )
 
+    except DatasetFileError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
     except SQLValidationError as exc:
         _log_sql_failure(
             dataset_id=request.dataset_id,
@@ -190,10 +192,9 @@ async def preview_dataset(
     )
 
     try:
-        result = await asyncio.to_thread(
-            sql_executor.execute,
+        result = await execute_dataset_sql(
+            dataset,
             "SELECT * FROM dataset",
-            dataset.config,
             limit,
         )
 
@@ -214,6 +215,8 @@ async def preview_dataset(
             result
         )
 
+    except DatasetFileError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
     except SQLValidationError as exc:
         _log_sql_failure(
             dataset_id=dataset_id,

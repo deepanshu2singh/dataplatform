@@ -9,7 +9,9 @@ import {
   Upload,
 } from 'lucide-react';
 
-import { api, UPLOAD_API_TIMEOUT_MS } from '../lib/api';
+import { api } from '../lib/api';
+import { loadDatasetUploadConfig, uploadDataset } from '../lib/datasetUpload';
+import type { DatasetUploadConfig, PendingCloudUpload } from '../lib/datasetUpload';
 import { getApiErrorMessage } from '../lib/apiError';
 import { isCanceledRequest, useLatestRequest } from '../hooks/useLatestRequest';
 import { AccessibleDialog } from '../components/AccessibleDialog';
@@ -37,8 +39,6 @@ interface Dataset {
   updated_at: string | null;
 }
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-
 export function DatasetsPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +49,9 @@ export function DatasetsPage() {
   const [datasetDescription, setDatasetDescription] = useState('');
 
   const [uploading, setUploading] = useState(false);
+  const [uploadConfig, setUploadConfig] = useState<DatasetUploadConfig | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<PendingCloudUpload | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [pageError, setPageError] = useState('');
@@ -96,6 +99,16 @@ export function DatasetsPage() {
     void fetchDatasets();
   }, [fetchDatasets]);
 
+  useEffect(() => {
+    let active = true;
+    void loadDatasetUploadConfig().then((config) => {
+      if (active) setUploadConfig(config);
+    }).catch(() => {
+      if (active) setPageError('Upload settings are unavailable. Please reload the page.');
+    });
+    return () => { active = false; };
+  }, []);
+
   const openUploadModal = () => {
     setUploadError('');
     setShowUpload(true);
@@ -103,6 +116,10 @@ export function DatasetsPage() {
 
   const closeUploadModal = () => {
     if (uploading) {
+      return;
+    }
+    if (pendingUpload !== null) {
+      setUploadError('Retry or discard the pending upload before closing.');
       return;
     }
 
@@ -117,6 +134,11 @@ export function DatasetsPage() {
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setUploadError('');
+
+    if (pendingUpload !== null || uploadConfig === null) {
+      setUploadError('Upload settings are loading, or an upload is still pending.');
+      return;
+    }
 
     const file = e.target.files?.[0];
 
@@ -149,12 +171,12 @@ export function DatasetsPage() {
       return;
     }
 
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > uploadConfig.max_upload_bytes) {
       setSelectedFile(null);
       e.target.value = '';
 
       setUploadError(
-        'The selected file exceeds the 100 MB upload limit.',
+        `The selected file exceeds the ${Math.floor(uploadConfig.max_upload_bytes / (1024 * 1024))} MB upload limit.`,
       );
 
       return;
@@ -175,6 +197,11 @@ export function DatasetsPage() {
     e.preventDefault();
 
     setUploadError('');
+
+    if (uploadConfig === null) {
+      setUploadError('Upload settings are unavailable. Please reload the page.');
+      return;
+    }
 
     const cleanName = datasetName.trim();
 
@@ -201,46 +228,32 @@ export function DatasetsPage() {
       return;
     }
 
-    if (selectedFile.size > MAX_UPLOAD_BYTES) {
+    if (selectedFile.size > uploadConfig.max_upload_bytes) {
       setUploadError(
-        'The selected file exceeds the 100 MB upload limit.',
+        `The selected file exceeds the ${Math.floor(uploadConfig.max_upload_bytes / (1024 * 1024))} MB upload limit.`,
       );
       return;
     }
 
     setUploading(true);
+    setUploadProgress(null);
 
     try {
-      const formData = new FormData();
-
-      formData.append('file', selectedFile);
-      formData.append('name', cleanName);
-      formData.append(
-        'description',
-        datasetDescription.trim(),
-      );
-
-      /*
-       * Do not manually set Content-Type here.
-       *
-       * The browser/Axios will generate the required
-       * multipart boundary automatically.
-       */
-      const response = await api.post<Dataset>(
-        '/datasets/upload',
-        formData,
-        { timeout: UPLOAD_API_TIMEOUT_MS },
-      );
+      const dataset = await uploadDataset<Dataset>({
+        file: selectedFile, name: cleanName, description: datasetDescription.trim(),
+        config: uploadConfig, pending: pendingUpload,
+        onPending: setPendingUpload, onProgress: setUploadProgress,
+      });
 
       setDatasets((current) => [
-        response.data,
+        dataset,
         ...current.filter(
-          (dataset) =>
-            dataset.id !== response.data.id,
+          (existing) => existing.id !== dataset.id,
         ),
       ]);
 
-      setExpandedId(response.data.id);
+      setExpandedId(dataset.id);
+      setPendingUpload(null);
 
       setSelectedFile(null);
       setDatasetName('');
@@ -254,6 +267,21 @@ export function DatasetsPage() {
           'Upload failed. Please try again.',
         ),
       );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const discardUpload = async () => {
+    if (!pendingUpload || uploading) return;
+    setUploading(true);
+    try {
+      await api.delete(`/datasets/uploads/${pendingUpload.signed.upload_id}`);
+      setPendingUpload(null);
+      setUploadError('');
+      setUploadProgress(null);
+    } catch (err: unknown) {
+      setUploadError(getApiErrorMessage(err, 'Could not discard the upload. Retry completion or try again.'));
     } finally {
       setUploading(false);
     }
@@ -584,6 +612,7 @@ export function DatasetsPage() {
                   type="text"
                   required
                   maxLength={255}
+                  disabled={uploading || pendingUpload !== null}
                   value={datasetName}
                   onChange={(e) =>
                     setDatasetName(
@@ -609,6 +638,8 @@ export function DatasetsPage() {
 
                 <textarea
                   id="dataset-description"
+                  disabled={uploading || pendingUpload !== null}
+                  maxLength={10000}
                   value={datasetDescription}
                   onChange={(e) =>
                     setDatasetDescription(
@@ -631,6 +662,7 @@ export function DatasetsPage() {
 
                 <input
                   id="dataset-file"
+                  disabled={uploading || pendingUpload !== null || uploadConfig === null}
                   type="file"
                   accept=".csv,text/csv"
                   onChange={handleFileSelect}
@@ -641,7 +673,7 @@ export function DatasetsPage() {
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   CSV only. Maximum size:
                   {' '}
-                  100 MB.
+                  {uploadConfig ? `${Math.floor(uploadConfig.max_upload_bytes / (1024 * 1024))} MB.` : 'Loading…'}
                 </p>
               </div>
 
@@ -667,20 +699,22 @@ export function DatasetsPage() {
                 </div>
               )}
 
+              {uploadProgress !== null && <p role="status">Transferred {uploadProgress}%. Preparing dataset…</p>}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={closeUploadModal}
+                  onClick={pendingUpload ? () => { void discardUpload(); } : closeUploadModal}
                   disabled={uploading}
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
-                  Cancel
+                  {pendingUpload ? 'Discard upload' : 'Cancel'}
                 </button>
 
                 <button
                   type="submit"
                   disabled={
                     uploading ||
+                    uploadConfig === null ||
                     !selectedFile ||
                     !datasetName.trim()
                   }
@@ -692,7 +726,7 @@ export function DatasetsPage() {
                       Uploading...
                     </span>
                   ) : (
-                    'Upload Dataset'
+                    pendingUpload ? 'Retry upload' : 'Upload Dataset'
                   )}
                 </button>
               </div>

@@ -3,6 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, UPLOAD_API_TIMEOUT_MS } from '../lib/api';
 import { DatasetsPage } from './DatasetsPage';
+import { loadDatasetUploadConfig } from '../lib/datasetUpload';
+import * as datasetUpload from '../lib/datasetUpload';
+vi.mock('../lib/datasetUpload', async (original) => ({
+  ...await original<typeof import('../lib/datasetUpload')>(),
+  loadDatasetUploadConfig: vi.fn(),
+}));
 
 const SALES_DATASET = {
   id: 7,
@@ -33,6 +39,7 @@ function mockDatasetList(data = [SALES_DATASET]) {
 describe('DatasetsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.mocked(loadDatasetUploadConfig).mockResolvedValue({ storage_backend: 'local', max_upload_bytes: 100 * 1024 * 1024 });
   });
 
   it('loads datasets and expands schema and preview data', async () => {
@@ -136,6 +143,42 @@ describe('DatasetsPage', () => {
       expect(deleteSpy).toHaveBeenCalledWith('/datasets/7');
     });
     expect(await screen.findByText('No datasets yet')).toBeInTheDocument();
+  });
+
+  it('keeps existing datasets when adding an upload', async () => {
+    mockDatasetList();
+    vi.spyOn(api, 'post').mockResolvedValue({ data:{ ...SALES_DATASET, id:8, name:'Fresh CSV' } });
+    const user = userEvent.setup();
+    render(<DatasetsPage />);
+    await screen.findByText('Sales Data');
+    await user.click(screen.getAllByRole('button', { name:'Upload Dataset' })[0]);
+    await user.upload(screen.getByLabelText('CSV file'), new File(['a\n1\n'],'fresh.csv',{ type:'text/csv' }));
+    fireEvent.submit(screen.getByLabelText('Dataset name').closest('form')!);
+    expect(await screen.findByText('Fresh CSV')).toBeInTheDocument();
+    expect(screen.getByText('Sales Data')).toBeInTheDocument();
+  });
+
+  it('freezes failed cloud upload metadata until retry or discard', async () => {
+    mockDatasetList([]);
+    vi.mocked(loadDatasetUploadConfig).mockResolvedValue({ storage_backend:'supabase', max_upload_bytes:50*1024*1024 });
+    vi.spyOn(datasetUpload, 'uploadDataset').mockImplementation(async (options) => {
+      options.onPending({ transferred:true, signed:{ upload_id:'abc', token:'temporary', object_key:'users/7/abc.csv', bucket:'datasets', tus_endpoint:'https://example.storage.supabase.co/storage/v1/upload/resumable', chunk_size:6*1024*1024, expires_at:'2026-10-11T15:00:00Z' } });
+      throw { response:{ status:503, data:{ detail:'temporarily unavailable' } } };
+    });
+    const remove = vi.spyOn(api,'delete').mockResolvedValue({ data:null });
+    const user = userEvent.setup();
+    render(<DatasetsPage />);
+    await screen.findByText('No datasets yet');
+    await user.click(screen.getAllByRole('button', { name:'Upload Dataset' })[0]);
+    expect(screen.getByText(/50 MB/)).toBeInTheDocument();
+    await user.upload(screen.getByLabelText('CSV file'), new File(['a\n1\n'],'fresh.csv',{ type:'text/csv' }));
+    fireEvent.submit(screen.getByLabelText('Dataset name').closest('form')!);
+    await screen.findByRole('button',{ name:'Retry upload' });
+    expect(screen.getByLabelText('Dataset name')).toBeDisabled();
+    expect(screen.getByLabelText('CSV file')).toBeDisabled();
+    await user.click(screen.getByRole('button',{ name:'Discard upload' }));
+    await waitFor(() => expect(screen.getByLabelText('CSV file')).toBeEnabled());
+    expect(remove).toHaveBeenCalledWith('/datasets/uploads/abc');
   });
 
 

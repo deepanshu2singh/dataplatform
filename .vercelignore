@@ -1,0 +1,43 @@
+# Secrets and private data
+.env
+**/.env
+*.env
+**/*.env
+.env.*
+**/.env.*
+*.pem
+**/*.pem
+*.key
+**/*.key
+*.crt
+**/*.crt
+*credentials*.json
+**/*credentials*.json
+# Safe examples are allowed
+!.env.example
+!**/.env.example
+!backend/.env.cloud.example
+# Dependencies, generated output and local archives
+.git/
+.vercel/
+.venv/
+**/.venv/
+venv/
+**/venv/
+**/node_modules/
+**/dist/
+**/coverage/
+**/__pycache__/
+**/.pytest_cache/
+**/.vite/
+**/*.pyc
+**/*.tsbuildinfo
+**/*.dump
+**/*.zip
+checkpoints/
+archive/
+backups/
+.phase8f6/
+backend/uploads/
+# This ZIP is an essential self-hosted browser runtime asset
+!frontend/public/pyodide/314.0.7/python_stdlib.zip

@@ -160,6 +160,9 @@ class JSONLogFormatter(logging.Formatter):
         "user_id",
         "reason",
         "operation",
+        "exception_types",
+        "sqlstate",
+        "timeout_seconds",
     )
 
     def format(self, record: logging.LogRecord) -> str:
@@ -181,6 +184,19 @@ class JSONLogFormatter(logging.Formatter):
             value = getattr(record, field, None)
 
             if value is not None:
+                if field == "exception_types":
+                    if not isinstance(value, list):
+                        continue
+                    value = [
+                        name for name in value[:8]
+                        if isinstance(name, str) and len(name) <= 80 and name.isidentifier()
+                    ]
+                elif field == "sqlstate":
+                    if not isinstance(value, str) or not re.fullmatch(r"[0-9A-Z]{5}", value):
+                        continue
+                elif field == "timeout_seconds":
+                    if type(value) not in (int, float) or not 0 < value <= 30:
+                        continue
                 payload[field] = (
                     sanitize_log_text(value)
                     if isinstance(value, str)

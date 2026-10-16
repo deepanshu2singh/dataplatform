@@ -1,3 +1,8 @@
+import { WidgetRenderer } from '../components/dashboard/WidgetRenderer';
+import type { DashboardWidget, DashboardLayout, WidgetType, WidgetDataResponse, PresentationOptions } from '../lib/dashboardTypes';
+import { DashboardCanvas } from '../components/dashboard/DashboardCanvas';
+import { canvasWidgets } from '../lib/dashboardLayout';
+import { ThemeControl } from '../components/ThemeControl';
 import {
   useCallback,
   useEffect,
@@ -20,20 +25,7 @@ import {
   RefreshCw,
   Table2,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+
 
 import { api } from '../lib/api';
 import { getApiErrorMessage } from '../lib/apiError';
@@ -42,37 +34,6 @@ import {
   useLatestKeyedRequests,
   useLatestRequest,
 } from '../hooks/useLatestRequest';
-
-type WidgetType = 'chart' | 'table' | 'markdown' | 'metric';
-type MetricFormat = 'number' | 'currency' | 'percent' | 'text';
-
-interface DashboardPosition {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface DashboardDataSource {
-  dataset_id: number;
-  notebook_id?: number | null;
-  query: string;
-  limit: number;
-}
-
-interface DashboardWidget {
-  id: string;
-  type: WidgetType;
-  title: string;
-  config: Record<string, unknown>;
-  position: DashboardPosition;
-  source?: DashboardDataSource | null;
-}
-
-interface DashboardLayout {
-  version: 1;
-  widgets: DashboardWidget[];
-}
 
 interface ReferenceIssue {
   widget_id: string;
@@ -91,37 +52,6 @@ interface Dashboard {
   created_at: string;
   updated_at: string | null;
   reference_issues: ReferenceIssue[];
-}
-
-interface WidgetVisualization {
-  kind: 'table' | 'metric' | 'bar' | 'line' | 'pie' | 'donut';
-  x_column?: string | null;
-  y_column?: string | null;
-  series_column?: string | null;
-  value_column?: string | null;
-  metric_value?: unknown;
-  format?: MetricFormat | null;
-  decimals?: number | null;
-  prefix?: string | null;
-  suffix?: string | null;
-  display_columns?: string[] | null;
-  show_legend?: boolean | null;
-}
-
-interface WidgetDataResponse {
-  dashboard_id: number | null;
-  widget_id: string;
-  widget_type: 'chart' | 'table' | 'metric';
-  dataset_id: number;
-  dataset_name: string;
-  columns: string[];
-  data: Record<string, unknown>[];
-  row_count: number;
-  dtypes: Record<string, string>;
-  truncated: boolean;
-  limit: number;
-  execution_ms: number;
-  visualization: WidgetVisualization;
 }
 
 interface WidgetRuntimeState {
@@ -404,6 +334,7 @@ export function DashboardViewerPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <ThemeControl />
             <button
               type="button"
               onClick={() => void refreshWidgets(dashboard)}
@@ -472,20 +403,12 @@ export function DashboardViewerPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            {dashboard.layout.widgets.map((widget) => (
-              <ViewerWidgetCard
-                key={widget.id}
-                dashboardId={dashboard.id}
-                widget={widget}
-                runtime={runtime[widget.id] ?? EMPTY_RUNTIME}
-                referenceIssue={dashboard.reference_issues.find(
-                  (issue) => issue.widget_id === widget.id,
-                )}
-                onRefresh={() => void executeWidget(dashboard.id, widget)}
-              />
-            ))}
-          </div>
+          <DashboardCanvas widgets={canvasWidgets(dashboard.layout.widgets, dashboard.layout.version)} renderWidget={widget=><ViewerWidgetCard
+            dashboardId={dashboard.id} widget={widget} runtime={runtime[widget.id] ?? EMPTY_RUNTIME}
+            referenceIssue={dashboard.reference_issues.find(issue=>issue.widget_id===widget.id)}
+            onRefresh={()=>void executeWidget(dashboard.id,widget)}
+          />}/>
+
         )}
       </main>
     </ViewerShell>
@@ -494,7 +417,7 @@ export function DashboardViewerPage() {
 
 function ViewerShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
+    <div className="dashboard-workspace min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
       {children}
     </div>
   );
@@ -513,15 +436,13 @@ function ViewerWidgetCard({
   referenceIssue?: ReferenceIssue;
   onRefresh: () => void;
 }) {
-  const fullWidth = widget.position.w >= 900;
-  const height = Math.max(240, Math.min(widget.position.h, 620));
 
   return (
     <article
-      className={`${fullWidth ? 'xl:col-span-2' : ''} overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900`}
+      className="dashboard-card"
       data-dashboard-id={dashboardId}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+      <header className="dashboard-card-header">
         <div className="flex min-w-0 items-center gap-2">
           <WidgetTypeIcon type={widget.type} />
           <div className="min-w-0">
@@ -553,7 +474,7 @@ function ViewerWidgetCard({
         </div>
       )}
 
-      <div className="p-4" style={{ minHeight: height }}>
+      <div className="dashboard-card-body">
         {widget.type === 'markdown' ? (
           <SafeMarkdown text={String(widget.config.markdown ?? '')} />
         ) : referenceIssue ? (
@@ -576,7 +497,7 @@ function ViewerWidgetCard({
             </button>
           </div>
         ) : runtime.data ? (
-          <WidgetRenderer response={runtime.data} />
+          <WidgetRenderer response={runtime.data} config={widget.config as PresentationOptions} widgetType={widget.type}/>
         ) : (
           <EmptyDataState message="No data has been loaded for this widget yet." />
         )}
@@ -607,186 +528,6 @@ function WidgetLoadingState() {
         <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800/70" />
         <div className="h-4 w-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800/70" />
       </div>
-    </div>
-  );
-}
-
-function WidgetRenderer({ response }: { response: WidgetDataResponse }) {
-  const visualization = response.visualization;
-
-  if (visualization.kind === 'table') {
-    const columns = visualization.display_columns?.length
-      ? visualization.display_columns
-      : response.columns;
-    return <DataTable columns={columns} rows={response.data} />;
-  }
-
-  if (visualization.kind === 'metric') {
-    return (
-      <MetricCard
-        value={visualization.metric_value}
-        format={visualization.format ?? 'number'}
-        decimals={visualization.decimals ?? 2}
-        prefix={visualization.prefix ?? ''}
-        suffix={visualization.suffix ?? ''}
-      />
-    );
-  }
-
-  return <DataChart response={response} />;
-}
-
-function DataTable({
-  columns,
-  rows,
-}: {
-  columns: string[];
-  rows: Record<string, unknown>[];
-}) {
-  if (rows.length === 0) {
-    return <EmptyDataState message="Query returned no rows." />;
-  }
-
-  return (
-    <div className="max-h-[520px] overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
-      <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-950">
-          <tr>
-            {columns.map((column) => (
-              <th
-                scope="col"
-                key={column}
-                className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              >
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900">
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {columns.map((column) => (
-                <td
-                  key={`${rowIndex}-${column}`}
-                  className="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300"
-                >
-                  {formatCellValue(row[column])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function MetricCard({
-  value,
-  format,
-  decimals,
-  prefix,
-  suffix,
-}: {
-  value: unknown;
-  format: MetricFormat;
-  decimals: number;
-  prefix: string;
-  suffix: string;
-}) {
-  return (
-    <div className="flex min-h-52 items-center justify-center">
-      <p className="text-center text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
-        {formatMetricValue(value, format, decimals, prefix, suffix)}
-      </p>
-    </div>
-  );
-}
-
-function DataChart({ response }: { response: WidgetDataResponse }) {
-  const visualization = response.visualization;
-  const xColumn = visualization.x_column;
-  const yColumn = visualization.y_column;
-
-  if (!xColumn || !yColumn) {
-    return <EmptyDataState message="Chart configuration is incomplete." />;
-  }
-
-  if (response.data.length === 0) {
-    return <EmptyDataState message="Query returned no chart points." />;
-  }
-
-  if (visualization.kind === 'pie' || visualization.kind === 'donut') {
-    return (
-      <div className="h-[340px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            <Pie
-              data={response.data}
-              dataKey={yColumn}
-              nameKey={xColumn}
-              cx="50%"
-              cy="50%"
-              outerRadius="78%"
-              innerRadius={visualization.kind === 'donut' ? '48%' : 0}
-              fill="currentColor"
-              className="text-blue-600"
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  const series = prepareSeriesChartData(
-    response.data,
-    xColumn,
-    yColumn,
-    visualization.series_column ?? null,
-  );
-
-  return (
-    <div className="h-[340px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        {visualization.kind === 'line' ? (
-          <LineChart data={series.rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={xColumn} />
-            <YAxis />
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            {series.keys.map((key) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke="currentColor"
-                className="text-blue-600"
-                dot={false}
-              />
-            ))}
-          </LineChart>
-        ) : (
-          <BarChart data={series.rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey={xColumn} />
-            <YAxis />
-            <Tooltip />
-            {visualization.show_legend !== false && <Legend />}
-            {series.keys.map((key) => (
-              <Bar
-                key={key}
-                dataKey={key}
-                fill="currentColor"
-                className="text-blue-600"
-              />
-            ))}
-          </BarChart>
-        )}
-      </ResponsiveContainer>
     </div>
   );
 }
@@ -863,77 +604,6 @@ function ErrorBanner({ message }: { message: string }) {
     </div>
   );
 }
-
-function prepareSeriesChartData(
-  data: Record<string, unknown>[],
-  xColumn: string,
-  yColumn: string,
-  seriesColumn: string | null,
-): { rows: Record<string, unknown>[]; keys: string[] } {
-  if (!seriesColumn) {
-    return { rows: data, keys: [yColumn] };
-  }
-
-  const rowMap = new Map<string, Record<string, unknown>>();
-  const keys: string[] = [];
-
-  for (const row of data) {
-    const xValue = row[xColumn];
-    const seriesValue = String(row[seriesColumn] ?? 'Series');
-    const mapKey = String(xValue ?? '');
-
-    if (!keys.includes(seriesValue)) {
-      keys.push(seriesValue);
-    }
-
-    const current = rowMap.get(mapKey) ?? { [xColumn]: xValue };
-    current[seriesValue] = row[yColumn];
-    rowMap.set(mapKey, current);
-  }
-
-  return { rows: Array.from(rowMap.values()), keys };
-}
-
-function formatMetricValue(
-  value: unknown,
-  format: MetricFormat,
-  decimals: number,
-  prefix: string,
-  suffix: string,
-): string {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  if (format === 'text' || typeof value !== 'number') {
-    return `${prefix}${String(value)}${suffix}`;
-  }
-
-  const formatted = new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-
-  const percentSuffix = format === 'percent' && !suffix ? '%' : suffix;
-  return `${prefix}${formatted}${percentSuffix}`;
-}
-
-function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-
-  return String(value);
-}
-
 
 function formatTime(value: Date): string {
   return value.toLocaleTimeString(undefined, {

@@ -1,0 +1,24 @@
+{
+  "phase": "signed-tus-endpoint-correction",
+  "input_source_checkpoint_sha256": "664ea6133e2faa7787ef575539c5bbcec51f344f5b5fec574dccd42afef74d6a",
+  "input_source_files_verified": 232,
+  "runtime_files_modified": ["backend/app/services/storage.py"],
+  "test_files_modified": ["backend/tests/test_storage_service.py", "backend/tests/test_cloud_dataset_flow.py", "frontend/src/lib/datasetUpload.test.ts"],
+  "new_docs": ["docs/phases/cloud/CLOUD_SIGNED_TUS.md", "docs/phases/cloud/CLOUD_SIGNED_TUS_VALIDATION.json"],
+  "backend_checks": {
+    "python": "3.12",
+    "passed": 44,
+    "warnings": 1,
+    "seconds": 1.36,
+    "files": ["tests/test_storage_service.py", "tests/test_cloud_storage_extensions.py", "tests/test_cloud_dataset_flow.py"],
+    "live_database": false
+  },
+  "frontend_checks": {"passed": 5, "files": ["src/lib/datasetUpload.test.ts"], "live_storage": false},
+  "application_dependency_changes": false,
+  "credential_changes": false,
+  "migrations_run": false,
+  "windows_checks": "pending user execution",
+  "hosted_readiness": "pending; last unique deployment check was InvalidPasswordError/28P01",
+  "live_upload": "pending after fresh preparation uses the signed route",
+  "prepared_snapshot_is_user_machine_capture": false
+}

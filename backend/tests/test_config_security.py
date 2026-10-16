@@ -1,4 +1,5 @@
 import pytest
+import traceback
 from fastapi import Response
 from pydantic import ValidationError
 
@@ -111,3 +112,33 @@ def test_set_auth_cookie_uses_production_security_attributes(monkeypatch) -> Non
     assert "samesite=lax" in set_cookie
     assert "path=/api/v1" in set_cookie
     assert "max-age=1800" in set_cookie
+
+
+def test_short_signing_key_is_rejected_without_rendering_its_value() -> None:
+    secret = "SHORT_PRIVATE_KEY"
+    with pytest.raises(ValidationError) as captured:
+        make_settings(SECRET_KEY=secret)
+
+    rendered = "".join(traceback.format_exception(captured.value))
+    assert "SECRET_KEY" in rendered
+    assert "at least 32 characters" in rendered
+    assert secret not in rendered
+    assert "input_value" not in rendered
+
+
+def test_model_security_error_does_not_render_other_private_settings() -> None:
+    database_url = "postgresql+asyncpg://user:PRIVATE_DB_PASSWORD@private.invalid/db"
+    with pytest.raises(ValidationError) as captured:
+        make_settings(
+            ENVIRONMENT="production",
+            SECRET_KEY=STRONG_SECRET,
+            DATABASE_URL=database_url,
+            FRONTEND_URL="http://app.example.com",
+        )
+
+    rendered = "".join(traceback.format_exception(captured.value))
+    assert "Production FRONTEND_URL must use HTTPS" in rendered
+    assert STRONG_SECRET not in rendered
+    assert database_url not in rendered
+    assert "PRIVATE_DB_PASSWORD" not in rendered
+    assert "input_value" not in rendered

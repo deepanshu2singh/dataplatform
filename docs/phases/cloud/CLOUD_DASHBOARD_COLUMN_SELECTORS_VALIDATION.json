@@ -1,0 +1,76 @@
+{
+  "phase": "dashboard-column-selectors-in-phase-B-correction",
+  "status": "prepared; local checks passed; Windows/deployment/live correction acceptance pending",
+  "input_provenance": {
+    "actual_canvas_checkpoint_sha256": "47d756eb7d8075f4adf7a2a943dd74b2c5abbd3b194431bfcbb551937f80f152",
+    "applied_presentation_patch_sha256": "d9d0e9121020ef2e3794721d34a7b0cfe20906082df983923125c6023d45991c",
+    "applied_test_fix_script_sha256": "4f476401f813e0a314c0a693e30f12a159ac56a55292e93bf1db20aa87709e64",
+    "derived_reference_entries_verified": 274,
+    "fresh_actual_post_B_checkpoint_received": false
+  },
+  "existing_live_evidence": {
+    "deployment": "dataplatform-v1-pyg55odcz-deepanshu1927.vercel.app",
+    "raw_health": "live200; ready200 database/migrations ok",
+    "user_reported": "Stacked/scatter/combo, Save/refresh/viewer accepted",
+    "screenshots_inspected": 2,
+    "backend_windows": "241 passed, 2 warnings; unchanged by correction"
+  },
+  "local_frontend": {
+    "tests": 155,
+    "files": 29,
+    "focused_selector_tests": 9,
+    "status": "PASS",
+    "typescript_cloud_build_sanitizer_python_assets": "PASS",
+    "lint_errors": 0,
+    "existing_lint_warnings": 9,
+    "new_lint_warnings": 0,
+    "dependencies_unchanged": true
+  },
+  "browser": {
+    "status": "PASS",
+    "production_csp": true,
+    "data": "synthetic API fixtures, not live Supabase",
+    "checks": [
+      "All 10 real SVG charts light/dark; combo bar+line; viewer table sort/page/reset does not save",
+      "390px layouts remain within viewport in light/dark",
+      "Existing saved column names appear in real SELECT elements without edits or a discovery call",
+      "Native select keyboard selection updates field values",
+      "All ten chart types render inside the real editor preview without automatic SQL execution",
+      "Native column selectors fit the real editor in light/dark and at 390px; formatting and chart preview remain connected",
+      "Actual field discovery; instant style with zero preview calls; explicit preview; version3 save/reload retains chart settings and placement",
+      "409 save preserves draft"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "unexpected_errors": [],
+    "internal_form_screenshots_inspected": 3,
+    "screenshots_delivered": false
+  },
+  "scope": {
+    "modified_existing_files": 2,
+    "new_files": 3,
+    "backend_migration_runtime_hosting_dependency_changes": false,
+    "saved_field_name_strings": "preserved; no automatic replacement",
+    "field_source": "actual query-result columns including aliases",
+    "discovery": "explicit limit1 request through owned SQL route; no query on selection",
+    "stale_requests": "abort and key check",
+    "missing_selection": "preserved, marked invalid, explicitly replaced",
+    "table_visibility": "checkboxes from loaded fields; no typed comma list",
+    "layout_version": 3
+  },
+  "package_simulation": "PASS: exact before/after guards; payload hashes; idempotence; partial apply; target/prerequisite conflicts; scoped rollback; full source CRC/hashes. Python byte simulation, not native PowerShell.",
+  "required_next": [
+    "Windows frontend tests/lint/cloud build through bundled helper",
+    "Deploy existing Vercel project after PASS",
+    "Verify health and actual selectors on existing saved charts",
+    "Continue remaining phase B table/metric/readability acceptance",
+    "Fresh actual source checkpoint before C"
+  ],
+  "rollback": "Selector correction rollback retains existing layout-v3 backend. Never use older v2-only parser rollback now that production v3 saves exist."
+}

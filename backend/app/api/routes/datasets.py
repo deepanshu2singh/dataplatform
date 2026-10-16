@@ -29,7 +29,18 @@ from app.schemas.dataset import (
     DatasetPythonExport,
     DatasetRead,
     DatasetUpdate,
+    DatasetUploadConfig,
+    DatasetUploadPrepare,
+    DatasetSignedUpload,
 )
+from app.services.dataset_files import (
+    DatasetFileError, cloud_object_key, dataset_file, python_snapshot_key, run_file_operation,
+)
+from app.services.dataset_uploads import (
+    prepare_upload, complete_upload, cancel_upload, delete_upload_objects,
+)
+from app.services.storage import StorageServiceError, get_supabase_storage_service
+from app.services.python_snapshot import PythonSnapshotTooLarge, prepare_python_snapshot
 
 
 router = APIRouter()
@@ -63,6 +74,41 @@ async def list_datasets(
     )
 
     return result.scalars().all()
+
+
+@router.get("/upload-config", response_model=DatasetUploadConfig)
+async def get_upload_config(current_user: UserModel = Depends(get_current_active_user)):
+    return DatasetUploadConfig(
+        storage_backend=settings.STORAGE_BACKEND,
+        max_upload_bytes=settings.effective_upload_max_bytes,
+    )
+
+
+@router.post("/uploads/prepare", response_model=DatasetSignedUpload, status_code=201)
+async def prepare_cloud_upload(
+    request: DatasetUploadPrepare,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user),
+):
+    return await prepare_upload(db, current_user.id, request)
+
+
+@router.post("/uploads/{upload_id}/complete", response_model=DatasetRead)
+async def complete_cloud_upload(
+    upload_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user),
+):
+    return await complete_upload(db, current_user.id, upload_id, infer_csv_schema)
+
+
+@router.delete("/uploads/{upload_id}", status_code=204)
+async def cancel_cloud_upload(
+    upload_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user),
+):
+    await cancel_upload(db, current_user.id, upload_id)
 
 
 @router.get("/{dataset_id}", response_model=DatasetRead)
@@ -138,15 +184,21 @@ async def delete_dataset(
     )
 
     file_path_to_remove: Path | None = None
+    cloud_key: str | None = None
 
     if dataset.type == DatasetType.FILE:
+        if (dataset.config or {}).get("storage_backend") == "supabase":
+            try:
+                cloud_key = cloud_object_key(dataset.config, current_user.id)
+            except DatasetFileError as exc:
+                raise HTTPException(exc.status_code, str(exc)) from exc
         configured_file_path = (
             dataset.config.get("file_path")
             if dataset.config
             else None
         )
 
-        if configured_file_path:
+        if configured_file_path and cloud_key is None:
             # Validate the stored path before mutating database state, but do
             # not remove the file until the database delete is committed. If
             # the commit fails, the dataset remains usable instead of pointing
@@ -158,6 +210,18 @@ async def delete_dataset(
         dataset,
         file_path_to_remove,
     )
+
+    if cloud_key is not None:
+        try:
+            await delete_upload_objects(cloud_key)
+        except StorageServiceError:
+            # The metadata commit succeeded. Expiry cleanup can reclaim the
+            # completed intent's unreferenced objects without a misleading 500.
+            logger.warning(
+                "Dataset cloud cleanup failed after metadata deletion",
+                extra={"event": "dataset_file_cleanup_failed", "resource_type": "dataset",
+                       "resource_id": dataset_id, "user_id": current_user.id},
+            )
 
 
 async def _delete_dataset_record_then_file(
@@ -212,6 +276,9 @@ async def upload_file(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_active_user),
 ):
+    if settings.STORAGE_BACKEND == "supabase":
+        await file.close()
+        raise HTTPException(409, "Use the direct cloud upload flow")
     clean_name = name.strip()
 
     if not clean_name:
@@ -349,31 +416,11 @@ async def get_dataset_schema(
     if dataset.schema_info:
         return dataset.schema_info
 
-    file_path = (
-        dataset.config.get("file_path")
-        if dataset.config
-        else None
-    )
-
-    if not file_path:
-        raise HTTPException(
-            status_code=500,
-            detail="Dataset file configuration is missing",
-        )
-
-    path = _safe_uploaded_path(file_path)
-
-    if not path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset file is missing",
-        )
-
     try:
-        return await asyncio.to_thread(
-            infer_csv_schema,
-            path,
-        )
+        async with dataset_file(dataset.config or {}, current_user.id) as path:
+            return await run_file_operation(infer_csv_schema, path)
+    except DatasetFileError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
@@ -402,114 +449,46 @@ async def export_dataset_for_python(
             detail="Only file datasets are supported by browser Python in V1",
         )
 
-    file_path = (
-        dataset.config.get("file_path")
-        if dataset.config
-        else None
-    )
+    config = dataset.config or {}
+    if config.get("storage_backend") == "supabase":
+        try:
+            key = cloud_object_key(config, current_user.id)
+            snapshot = config.get("python_export")
+            if not isinstance(snapshot, dict):
+                raise HTTPException(503, "Browser Python snapshot is unavailable")
+            if snapshot.get("too_large"):
+                raise HTTPException(413, "This dataset snapshot exceeds the 10 MB browser Python limit")
+            expected_key = python_snapshot_key(key)
+            if snapshot.get("object_key") != expected_key:
+                raise HTTPException(500, "Dataset Python snapshot configuration is invalid")
+            storage = get_supabase_storage_service()
+            url = await storage.create_signed_download(expected_key)
+            return DatasetPythonExport(
+                dataset_id=dataset.id, dataset_name=dataset.name, download_url=url,
+                **{name: value for name, value in snapshot.items() if name != "object_key"},
+            )
+        except DatasetFileError as exc:
+            raise HTTPException(exc.status_code, str(exc)) from exc
+        except StorageServiceError as exc:
+            raise HTTPException(503, "Dataset storage is temporarily unavailable") from exc
 
-    if not file_path:
-        raise HTTPException(
-            status_code=500,
-            detail="Dataset file configuration is missing",
-        )
-
-    path = _safe_uploaded_path(file_path)
-
-    if not path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset file is missing",
-        )
-
-    if path.suffix.lower() != ".csv":
-        raise HTTPException(
-            status_code=400,
-            detail="Browser Python currently supports CSV datasets only",
-        )
-
-    source_row_count: int | None = None
-
-    if isinstance(dataset.schema_info, dict):
-        row_count = dataset.schema_info.get("row_count")
-
-        if isinstance(row_count, int) and row_count >= 0:
-            source_row_count = row_count
-
+    source_row_count = (dataset.schema_info or {}).get("row_count")
+    if not isinstance(source_row_count, int) or source_row_count < 0:
+        source_row_count = None
     try:
-        frame = await asyncio.to_thread(
-            _read_python_export_frame,
-            path,
+        async with dataset_file(config, current_user.id) as path:
+            content, metadata = await run_file_operation(prepare_python_snapshot, path, source_row_count)
+        return DatasetPythonExport(
+            dataset_id=dataset.id, dataset_name=dataset.name,
+            csv_text=content.decode("utf-8"), **metadata,
         )
+    except DatasetFileError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except PythonSnapshotTooLarge as exc:
+        raise HTTPException(413, str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(400, str(exc)) from exc
 
-    loaded_row_count = min(
-        len(frame),
-        PYTHON_EXPORT_ROW_LIMIT,
-    )
-    truncated = len(frame) > PYTHON_EXPORT_ROW_LIMIT
-
-    if truncated:
-        frame = frame.iloc[:PYTHON_EXPORT_ROW_LIMIT].copy()
-
-    csv_text = await asyncio.to_thread(
-        frame.to_csv,
-        None,
-        index=False,
-    )
-
-    export_size = len(csv_text.encode("utf-8"))
-
-    if export_size > PYTHON_EXPORT_MAX_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                "This dataset snapshot is too large for browser Python. "
-                "The V1 bridge is limited to 10 MB after CSV serialization."
-            ),
-        )
-
-    if (
-        source_row_count is not None
-        and source_row_count > loaded_row_count
-    ):
-        truncated = True
-
-    return DatasetPythonExport(
-        dataset_id=dataset.id,
-        dataset_name=dataset.name,
-        csv_text=csv_text,
-        source_row_count=source_row_count,
-        loaded_row_count=loaded_row_count,
-        truncated=truncated,
-        row_limit=PYTHON_EXPORT_ROW_LIMIT,
-    )
-
-
-def _read_python_export_frame(
-    file_path: Path,
-) -> pd.DataFrame:
-    try:
-        return pd.read_csv(
-            file_path,
-            nrows=PYTHON_EXPORT_ROW_LIMIT + 1,
-        )
-    except (
-        pd.errors.EmptyDataError,
-        pd.errors.ParserError,
-        UnicodeDecodeError,
-    ) as exc:
-        raise ValueError(
-            "Could not prepare this CSV for browser Python"
-        ) from exc
-    except Exception as exc:
-        raise ValueError(
-            "Could not prepare this CSV for browser Python"
-        ) from exc
 
 
 def infer_csv_schema(

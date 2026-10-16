@@ -11,6 +11,7 @@ import { UnsavedChangesProvider } from './components/UnsavedChangesProvider';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { HomePage } from './pages/HomePage';
+import { BrandedLoadingScreen as FullPageLoading } from './components/BrandedLoadingScreen';
 
 // Keep the small, commonly used auth/home routes in the initial bundle.
 // Feature-heavy protected routes are loaded only when the user navigates to
@@ -46,20 +47,6 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
-
-function FullPageLoading() {
-  return (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading page"
-    >
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      <span className="sr-only">Loading page...</span>
-    </div>
-  );
-}
 
 function RouteErrorPage() {
   useRouteError();

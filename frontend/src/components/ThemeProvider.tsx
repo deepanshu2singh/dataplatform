@@ -14,7 +14,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, updatePreference] = useState(readPreference);
   const systemDark = useSyncExternalStore(subscribeToSystemTheme, readSystemDark, () => false);
   const resolvedTheme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
-  useLayoutEffect(() => { document.documentElement.dataset.theme = resolvedTheme; }, [resolvedTheme]);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme === 'dark' ? '#11120d' : '#f8f5f2');
+  }, [resolvedTheme]);
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;

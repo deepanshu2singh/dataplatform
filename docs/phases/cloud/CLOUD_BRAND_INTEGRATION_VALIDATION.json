@@ -1,0 +1,85 @@
+{
+  "phase": "cloud-brand-integration",
+  "status": "Prepared; local checks passed; Windows apply/checks, deployment and live acceptance pending",
+  "baseline_commit": "70a47dca5e48926d8f6cc84bbad9bc4c25388619",
+  "asset_zip_sha256": "ca900a3b7052d78e2c9488fac4576e1184199645cddab8018090cdbca52380f7",
+  "frontend_tests": {
+    "files": 29,
+    "passed": 157,
+    "new_checks": [
+      "Logo navigation preserves unsaved-work blocker",
+      "Browser theme colour agrees with before-React bootstrap and manual theme change"
+    ]
+  },
+  "lint": {
+    "errors": 0,
+    "existing_warnings": 9,
+    "new_warnings": 0
+  },
+  "cloud_build": {
+    "status": "PASS",
+    "same_origin_api": "/api/v1",
+    "self_hosted_python_assets": "PASS",
+    "editor_sanitizer_guard": "PASS",
+    "dependency_and_core_build_inputs_unchanged": true
+  },
+  "emitted_brand_assets": "PASS: HTML static links, native icon/image formats and dimensions, manifest identity/icon paths, accessible startup shell",
+  "browser": {
+    "status": "PASS",
+    "checks": [
+      "Real auth loading: desktop supplied artwork, mobile supplied icon/readable live text, reduced motion respected",
+      "Mobile sign-in, home art, sidebar navigation and brand-home return preserve routes and close the menu",
+      "Light/dark desktop branding has correct foreground, browser colour and persisted theme; no horizontal overflow",
+      "Icons, manifest, stylesheet and artwork return actual static resources under the production CSP",
+      "Existing logout, registration form and register-then-login flow remain connected",
+      "Initial HTML contains a branded readable shell before React; JavaScript-required explanation present"
+    ],
+    "errors": [],
+    "browser": "Chrome for Testing 155.0.8059.84",
+    "api": "Synthetic intercepted fixtures; no live credentials or Supabase calls",
+    "productionCSP": true
+  },
+  "visual_review": {
+    "screenshots_inspected": 7,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "overflow": "none",
+    "screenshot_delivery": false
+  },
+  "backend_dependency_hosting_database_changes": false,
+  "package_checks": {
+    "status": "PASS",
+    "runtime": "Native PowerShell 7.5.3 on Linux; actual Windows 5.1 still pending",
+    "checks": [
+      "All payload hashes and full baseline source guards",
+      "CRLF checkout and project path with spaces",
+      "Unchanged prerequisite edit rejection",
+      "New icon file conflict rejection",
+      "Partial application and scoped rollback",
+      "Idempotent full application",
+      "Later edit rejection before rollback",
+      "Byte-exact rollback of original files",
+      "Git HEAD and staging preserved"
+    ]
+  },
+  "pending": [
+    "Windows guarded apply",
+    "Windows frontend tests/lint/cloud asset checks",
+    "Deploy existing Vercel project",
+    "Raw liveness/readiness 200",
+    "Live favicon/home/auth/mobile/theme/loading checks",
+    "Commit/push branding source after acceptance",
+    "Fresh actual checkpoint after phase acceptance"
+  ],
+  "historical_pending": [
+    "Dashboard selector live acceptance and table/metric checks remain pending from phase B",
+    "Connected server-side filters/slicers are not implemented",
+    "Email ownership verification/provider selection remains pending"
+  ]
+}

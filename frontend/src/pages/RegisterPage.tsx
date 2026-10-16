@@ -1,4 +1,5 @@
 import { ThemeControl } from '../components/ThemeControl';
+import { BrandLogo } from '../components/BrandLogo';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,6 +57,7 @@ export function RegisterPage() {
       <div className="absolute right-4 top-4"><ThemeControl /></div>
       <div className="workspace-panel max-w-md w-full space-y-8 p-6 sm:p-8">
         <div>
+          <div className="brand-auth"><BrandLogo centered /></div>
           <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
             Create your account
           </h1>

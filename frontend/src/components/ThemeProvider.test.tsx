@@ -10,8 +10,19 @@ beforeEach(() => {
   media = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
   vi.stubGlobal('matchMedia', vi.fn(() => media));
 });
-afterEach(() => { vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme'); });
+afterEach(() => { vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme'); document.querySelector('meta[name="theme-color"]')?.remove(); });
 describe('application appearance', () => {
+  it('keeps browser theme colour aligned before startup and after a manual theme change', async () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.append(meta);
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    window.eval(bootstrap);
+    expect(meta.content).toBe('#11120d');
+    render(<ThemeProvider><ThemeControl /></ThemeProvider>);
+    await userEvent.setup().selectOptions(screen.getByLabelText('Appearance'), 'light');
+    expect(meta.content).toBe('#f8f5f2');
+  });
   it('switches both ways, persists the choice and restores it after remount', async () => {
     const user = userEvent.setup();
     const first = render(<ThemeProvider><ThemeControl /></ThemeProvider>);

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeControl } from './ThemeControl';
+import { BrandLogo } from './BrandLogo';
 import { getApiErrorMessage } from '../lib/apiError';
 import { useUnsavedChangesController } from '../hooks/useUnsavedChanges';
 
@@ -71,7 +72,7 @@ export function Layout() {
       <aside id="primary-navigation" className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white" aria-hidden="true">D</span><h1 className="text-lg font-semibold text-gray-900 dark:text-white">DataPlatform</h1></div>
+            <NavLink to="/" aria-label="Data Platform home" onClick={() => setSidebarOpen(false)}><BrandLogo /></NavLink>
             <button
               type="button"
               className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"

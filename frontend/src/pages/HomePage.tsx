@@ -26,6 +26,9 @@ export function HomePage() {
     })();
   }, [requestController, retry]);
   return <div className="workspace-enter mx-auto max-w-6xl space-y-7">
+    <div className="brand-home-panel">
+      <img className="brand-home-art" src="/homepage-logo-dark.png" alt="Data Platform — Analytics, data and insights" width="1600" height="500" decoding="async" />
+    </div>
     <div className="flex flex-wrap items-end justify-between gap-5">
       <div><p className="eyebrow mb-2">Your workspace</p>
         <h1 className="text-3xl font-semibold leading-tight text-gray-900 dark:text-white sm:text-4xl">Welcome back, {user?.full_name || user?.email?.split('@')[0]}.</h1>

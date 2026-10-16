@@ -100,6 +100,18 @@ describe('Layout unsaved-work integration', () => {
     expect(await screen.findByText('Home destination')).toBeInTheDocument();
   });
 
+  it('keeps unsaved-work protection when the new brand link is used', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderDirtyLayout();
+    await user.click(screen.getByRole('link', { name: 'Data Platform home' }));
+    expect(confirmSpy).toHaveBeenCalledWith(MESSAGE);
+    expect(screen.getByText('Dirty editor')).toBeInTheDocument();
+    confirmSpy.mockReturnValue(true);
+    await user.click(screen.getByRole('link', { name: 'Data Platform home' }));
+    expect(await screen.findByText('Home destination')).toBeInTheDocument();
+  });
+
   it('does not destroy the session when logout is rejected because work is unsaved', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();

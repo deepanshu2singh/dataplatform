@@ -2,13 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico?v=20261016" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261016" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=20261016" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20261016" />
+    <link rel="manifest" href="/site.webmanifest?v=20261016" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DataPlatform</title>
+    <meta name="application-name" content="Data Platform" />
+    <meta name="description" content="Your private analytics workspace for CSV datasets, SQL and Python notebooks, and interactive dashboards." />
+    <meta name="theme-color" content="#f8f5f2" />
+    <title>Data Platform</title>
     <script src="/theme-init.js"></script>
+    <link rel="stylesheet" href="/brand.css?v=20261016" />
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="brand-document">
+    <div id="root">
+      <div class="brand-loading-screen" role="status" aria-live="polite" aria-label="Loading page">
+        <picture class="brand-loading-picture"><source media="(max-width: 600px)" srcset="/android-chrome-512x512.png" /><img class="brand-loading-art" src="/loading-screen-1920x1080.png" alt="" aria-hidden="true" width="1920" height="1080" fetchpriority="low" /></picture>
+        <strong class="brand-loading-mobile-title">Data Platform</strong>
+        <div class="brand-loading-caption"><span class="brand-loading-indicator" aria-hidden="true"></span><p class="brand-loading-message">Preparing your workspace…</p></div>
+      </div>
+    </div>
+    <noscript>Data Platform needs JavaScript enabled to open your workspace.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

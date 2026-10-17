@@ -27,6 +27,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   verifyEmail: (code: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateProfile: (fullName: string | null, expectedFullName: string | null) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,8 +130,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateProfile = async (fullName: string | null, expectedFullName: string | null) => {
+    const request = sessionRequest.begin();
+    try {
+      const response = await api.patch<User>('/auth/me', {
+        full_name: fullName,
+        expected_full_name: expectedFullName,
+      }, { signal: request.signal });
+      if (!request.isCurrent()) {
+        throw Object.assign(new Error('The session changed before the profile response arrived'), { name: 'CanceledError', code: 'ERR_CANCELED' });
+      }
+      setUser(response.data);
+      return response.data;
+    } finally {
+      request.finish();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, verifyEmail, refreshUser: fetchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, verifyEmail, refreshUser: fetchUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

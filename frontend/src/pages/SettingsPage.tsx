@@ -1,262 +1,172 @@
-import { useState, type KeyboardEvent } from 'react';
-import { Bell, Database, Info, Mail, Shield, User } from 'lucide-react';
-
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Bell, Check, CheckCircle2, Database, Info, Laptop, LoaderCircle, Mail, Moon, Shield, Sun, SunMoon, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme, type ThemePreference } from '../contexts/theme';
+import { getApiErrorMessage } from '../lib/apiError';
+import { isCanceledRequest, useLatestRequest } from '../hooks/useLatestRequest';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChanges';
+import './SettingsPage.css';
 
-type SettingsTab = 'profile' | 'security' | 'notifications' | 'data';
-
+type SettingsTab = 'profile' | 'appearance' | 'security' | 'notifications' | 'data';
 const tabs = [
   { id: 'profile' as const, label: 'Profile', icon: User },
+  { id: 'appearance' as const, label: 'Appearance', icon: SunMoon },
   { id: 'security' as const, label: 'Security', icon: Shield },
   { id: 'notifications' as const, label: 'Notifications', icon: Bell },
   { id: 'data' as const, label: 'Data', icon: Database },
 ];
-
-function UnavailableCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-      <div className="flex items-start gap-3">
-        <Info
-          className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-          aria-hidden="true"
-        />
-        <div>
-          <h3 className="font-medium text-gray-900 dark:text-white">{title}</h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {description}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+const appearances: { value: ThemePreference; label: string; description: string; icon: typeof Sun }[] = [
+  { value: 'light', label: 'Light', description: 'Warm surfaces, clear detail.', icon: Sun },
+  { value: 'dark', label: 'Dark', description: 'A quieter canvas after hours.', icon: Moon },
+  { value: 'system', label: 'System', description: 'Follow your device setting.', icon: Laptop },
+];
+function UnavailableCard({ title, description }: { title: string; description: string }) {
+  return <div className="settings-unavailable"><Info size={18} aria-hidden="true" /><div><h3>{title}</h3><p>{description}</p></div></div>;
 }
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
+  const { preference, resolvedTheme, setPreference } = useTheme();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const storedName = user?.full_name ?? null;
+  const [profile, setProfile] = useState({ name: storedName ?? '', originalName: storedName });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const saveRequest = useLatestRequest();
+  const normalizedName = profile.name.trim() || null;
+  const dirty = normalizedName !== profile.originalName;
+  const nameLength = Array.from(profile.name).length;
+  const invalidName = nameLength > 255 || /[\p{Cc}\p{Cs}]/u.test(profile.name);
+  useUnsavedChangesGuard(dirty || busy, 'You have unsaved profile changes. Leave without saving?');
+  // Adjust only a clean form when shared account state changes. An edited draft
+  // keeps its original snapshot so the backend can detect a conflicting save.
+  if (!dirty && !busy && storedName !== profile.originalName) {
+    setProfile({ name: storedName ?? '', originalName: storedName });
+  }
 
-  const handleTabKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
-    index: number,
-  ) => {
-    let nextIndex = index;
-
-    if (event.key === 'ArrowRight') {
-      nextIndex = (index + 1) % tabs.length;
-    } else if (event.key === 'ArrowLeft') {
-      nextIndex = (index - 1 + tabs.length) % tabs.length;
-    } else if (event.key === 'Home') {
-      nextIndex = 0;
-    } else if (event.key === 'End') {
-      nextIndex = tabs.length - 1;
-    } else {
-      return;
-    }
-
+  const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
-
-    const nextTab = tabs[nextIndex];
-    if (!nextTab) {
-      return;
+    if (!dirty || busy || invalidName) return;
+    const request = saveRequest.begin();
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const saved = await updateProfile(normalizedName, profile.originalName);
+      if (request.isCurrent()) {
+        setProfile({ name: saved.full_name ?? '', originalName: saved.full_name });
+        setMessage('Your profile has been saved.');
+      }
+    } catch (reason) {
+      if (request.isCurrent() && !isCanceledRequest(reason)) {
+        setError(getApiErrorMessage(reason, 'We could not save your profile. Your edits are kept; please try again.'));
+      }
+    } finally {
+      if (request.isCurrent()) setBusy(false);
+      request.finish();
     }
-
-    setActiveTab(nextTab.id);
-    document.getElementById(`settings-tab-${nextTab.id}`)?.focus();
+  };
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    const next = tabs[nextIndex];
+    setActiveTab(next.id);
+    document.getElementById(`settings-tab-${next.id}`)?.focus();
   };
 
-  return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Settings
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Account settings are read-only in this V1 interface. Unsupported controls
-          are not simulated or presented as completed actions.
-        </p>
-      </div>
-
-      <div
-        role="status"
-        className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-900/20 dark:text-blue-200"
-      >
-        <Info className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
-        <span>
-          Profile editing, password management, two-factor authentication,
-          notification preferences, retention controls, data export, session
-          management, and account deletion require backend support that is not
-          available in this version.
-        </span>
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav
-            className="flex overflow-x-auto"
-            role="tablist"
-            aria-label="Settings sections"
-          >
-            {tabs.map((tab, index) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  id={`settings-tab-${tab.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  aria-controls={`settings-panel-${tab.id}`}
-                  tabIndex={activeTab === tab.id ? 0 : -1}
-                  onKeyDown={(event) => handleTabKeyDown(event, index)}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 border-b-2 px-6 py-4 text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div
-          id={`settings-panel-${activeTab}`}
-          role="tabpanel"
-          aria-labelledby={`settings-tab-${activeTab}`}
-          tabIndex={0}
-          className="p-6"
-        >
-          {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-6">
-                <div
-                  className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900"
-                  aria-hidden="true"
-                >
-                  <span className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                    {user?.full_name?.[0] ||
-                      user?.email?.[0]?.toUpperCase() ||
-                      'U'}
-                  </span>
-                </div>
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Profile
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Your current account information is shown below.
-                  </p>
+  const initial = Array.from(user?.full_name?.trim() || user?.email || 'U')[0]?.toUpperCase();
+  return <div className="settings-page workspace-enter">
+    <header className="settings-heading">
+      <div><p className="eyebrow">Personal workspace</p><h1>Settings</h1><p>Make this space feel like yours.</p></div>
+      {dirty && <span className="settings-draft">Unsaved name</span>}
+    </header>
+    <section className="settings-account workspace-panel" aria-label="Account overview">
+      <div className="settings-avatar" aria-hidden="true">{initial}</div>
+      <div className="settings-account-copy"><h2>{user?.full_name || 'Your account'}</h2><p>{user?.email}</p></div>
+      <span className={`settings-verification ${user?.email_verified ? 'is-verified' : ''}`}>
+        {user?.email_verified ? <CheckCircle2 size={15} aria-hidden="true" /> : <Mail size={15} aria-hidden="true" />}
+        {user?.email_verified ? 'Email verified' : 'Email not verified'}
+      </span>
+    </section>
+    <section className="settings-content workspace-panel" aria-label="Account settings">
+      <nav role="tablist" aria-label="Settings sections" className="settings-tabs">
+        {tabs.map((tab, index) => {
+          const Icon = tab.icon;
+          return <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab"
+            aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}>
+            <Icon size={16} aria-hidden="true" />{tab.label}
+          </button>;
+        })}
+      </nav>
+      <div id={`settings-panel-${activeTab}`} role="tabpanel" aria-labelledby={`settings-tab-${activeTab}`} tabIndex={0} className="settings-panel">
+        {activeTab === 'profile' && <>
+          <div className="settings-section-heading"><h2>Personal details</h2><p>Your name appears across your workspace.</p></div>
+          <form onSubmit={(event) => void saveProfile(event)} aria-busy={busy}>
+            <div className="settings-fields">
+              <div className="settings-field"><label htmlFor="settings-full-name">Full name <span>Optional</span></label>
+                <input id="settings-full-name" name="full_name" autoComplete="name" value={profile.name} maxLength={510}
+                  disabled={busy} aria-invalid={invalidName} aria-describedby="settings-name-help"
+                  onChange={(event) => { setProfile((current) => ({ ...current, name: event.target.value })); setError(''); setMessage(''); }} />
+                <div id="settings-name-help" className={`settings-field-help ${invalidName ? 'is-invalid' : ''}`}>
+                  <span>{invalidName ? 'Use a single-line name of up to 255 characters.' : 'Use the name you would like to see in your account.'}</span><span>{nameLength}/255</span>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="settings-full-name"
-                    className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Full Name
-                  </label>
-                  <input
-                    id="settings-full-name"
-                    type="text"
-                    value={user?.full_name || ''}
-                    readOnly
-                    aria-describedby="settings-profile-readonly"
-                    className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-900/40 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="settings-email"
-                    className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
-                      aria-hidden="true"
-                    />
-                    <input
-                      id="settings-email"
-                      type="email"
-                      value={user?.email || ''}
-                      readOnly
-                      aria-describedby="settings-profile-readonly"
-                      className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-4 text-gray-900 dark:border-gray-600 dark:bg-gray-900/40 dark:text-white"
-                    />
-                  </div>
-                </div>
+              <div className="settings-field"><label htmlFor="settings-email">Email address</label>
+                <div className="settings-email-input"><Mail size={17} aria-hidden="true" /><input id="settings-email" type="email" value={user?.email ?? ''} readOnly aria-describedby="settings-email-help" /></div>
+                <p id="settings-email-help" className="settings-field-help">Your sign-in email. Email address changes are not available here yet.</p>
               </div>
-
-              <p
-                id="settings-profile-readonly"
-                className="text-sm text-gray-500 dark:text-gray-400"
-              >
-                Profile editing is not available in this V1 interface.
-              </p>
             </div>
-          )}
-
-          {activeTab === 'security' && (
-            <div className="space-y-4">
-              <UnavailableCard
-                title="Password management"
-                description="Changing your password is not exposed by the current V1 API, so this interface does not pretend to save a password change."
-              />
-              <UnavailableCard
-                title="Two-factor authentication"
-                description="Two-factor authentication has not been implemented in the current backend."
-              />
-              <UnavailableCard
-                title="Session management"
-                description="The current backend does not expose a session list or a sign-out-all-other-sessions operation."
-              />
+            {error && <p role="alert" className="settings-feedback is-error">{error}</p>}
+            {message && <p role="status" className="settings-feedback is-success"><Check size={16} aria-hidden="true" />{message}</p>}
+            <div className="settings-form-footer"><p>{busy ? 'Saving your name…' : dirty ? 'Your changes are ready to save.' : 'Your saved details are up to date.'}</p>
+              <div><button type="button" className="settings-secondary" disabled={!dirty || busy} onClick={() => { setProfile({ name: storedName ?? '', originalName: storedName }); setError(''); setMessage(''); }}>Discard changes</button>
+                <button type="submit" className="primary-action" disabled={!dirty || busy || invalidName}>{busy ? <LoaderCircle className="settings-spinner" size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{busy ? 'Saving…' : 'Save changes'}</button></div>
             </div>
-          )}
-
-          {activeTab === 'notifications' && (
-            <div className="space-y-4">
-              <UnavailableCard
-                title="Notification preferences"
-                description="Email and digest preferences are not stored by the current V1 backend."
-              />
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                No notification preference shown here is persisted or applied.
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'data' && (
-            <div className="space-y-4">
-              <UnavailableCard
-                title="Retention controls"
-                description="User-configurable retention policies are not available in the current V1 backend."
-              />
-              <UnavailableCard
-                title="Data export"
-                description="A full account export endpoint has not been implemented."
-              />
-              <UnavailableCard
-                title="Account deletion"
-                description="Account deletion is not exposed by the current V1 API."
-              />
-            </div>
-          )}
-        </div>
+          </form>
+        </>}
+        {activeTab === 'appearance' && <>
+          <div className="settings-section-heading"><h2>Find your comfort zone</h2><p>A familiar workspace, in the light that suits you.</p></div>
+          <fieldset className="settings-appearance"><legend>Color theme</legend>
+            <div className="settings-theme-grid">{appearances.map((option) => {
+              const Icon = option.icon;
+              return <label key={option.value} className={`settings-theme-card ${preference === option.value ? 'is-selected' : ''}`}>
+                <input type="radio" name="settings-theme" value={option.value} checked={preference === option.value} onChange={() => setPreference(option.value)} />
+                <span className={`settings-theme-preview preview-${option.value}`} aria-hidden="true"><span className="preview-sidebar"><i /><i /><i /></span><span className="preview-main"><i /><span><i /><i /></span><i /></span></span>
+                <span className="settings-theme-label"><Icon size={16} aria-hidden="true" /><strong>{option.label}</strong><span className="settings-radio-mark" aria-hidden="true">{preference === option.value && <Check size={12} />}</span></span>
+                <span className="settings-theme-description">{option.description}</span>
+              </label>;
+            })}</div>
+          </fieldset>
+          <p className="settings-appearance-note">Applied immediately and remembered in this browser. The header appearance control uses the same preference.{preference === 'system' && ` Your device is currently using ${resolvedTheme} mode.`}</p>
+        </>}
+        {activeTab === 'security' && <>
+          <div className="settings-section-heading"><h2>Account security</h2><p>{user?.email_verified ? 'Your email is verified.' : 'Your email has not been verified.'} More account controls are on the way.</p></div>
+          <div className="settings-unavailable-list">
+            <UnavailableCard title="Password management" description="Password changes are not available in Settings yet." />
+            <UnavailableCard title="Two-factor authentication" description="Two-factor authentication is not available yet. Email verification confirms inbox access; it is not two-factor authentication." />
+            <UnavailableCard title="Session management" description="You can sign out of this browser using the sidebar. A device list and sign-out-all-sessions control are not available yet." />
+          </div>
+        </>}
+        {activeTab === 'notifications' && <>
+          <div className="settings-section-heading"><h2>Notifications</h2><p>Your optional updates and account messages.</p></div>
+          <UnavailableCard title="Notification preferences" description="Optional notification and digest preferences are not available yet. Email verification messages are part of account security." />
+        </>}
+        {activeTab === 'data' && <>
+          <div className="settings-section-heading"><h2>Your account data</h2><p>Your datasets, notebooks and dashboards stay in your workspace.</p></div>
+          <div className="settings-unavailable-list">
+            <UnavailableCard title="Retention controls" description="Custom automatic retention policies are not available yet." />
+            <UnavailableCard title="Data export" description="A full account export is not available yet." />
+            <UnavailableCard title="Account deletion" description="Account deletion is not available in Settings yet." />
+          </div>
+        </>}
       </div>
-    </div>
-  );
+    </section>
+    <p className="settings-footnote"><Shield size={14} aria-hidden="true" />Your settings belong to your account. Your theme choice belongs to this browser.</p>
+  </div>;
 }

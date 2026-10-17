@@ -24,6 +24,8 @@ function AuthProbe() {
       <div data-testid="loading">{String(auth.loading)}</div>
       <div data-testid="user-email">{auth.user?.email ?? 'none'}</div>
       <div data-testid="verified">{String(auth.user?.email_verified)}</div>
+      <div data-testid="full-name">{auth.user?.full_name ?? 'none'}</div>
+      <button onClick={() => void auth.updateProfile('Updated Name', 'Test User').catch((reason: unknown) => setError(String(reason)))}>Save profile probe</button>
       <button onClick={() => void auth.verifyEmail('00001234').catch((reason: unknown) => setError(String(reason)))}>Verify probe</button>
       <div data-testid="error">{error}</div>
       <button
@@ -244,6 +246,33 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
     resolveVerification({ data: TEST_USER });
     await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+  });
+
+  it('updates shared identity from the saved profile without storing credentials', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: { ...TEST_USER, full_name: 'Updated Name' } });
+    const user = userEvent.setup(); renderAuthProbe();
+    await screen.findByText('Test User');
+    await user.click(screen.getByRole('button', { name: 'Save profile probe' }));
+    await waitFor(() => expect(screen.getByTestId('full-name')).toHaveTextContent('Updated Name'));
+    expect(patch).toHaveBeenCalledWith('/auth/me', { full_name: 'Updated Name', expected_full_name: 'Test User' }, expect.objectContaining({ signal: expect.any(Object) }));
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('does not resurrect an account when a profile save arrives after logout', async () => {
+    let resolveSave!: (value: { data: typeof TEST_USER }) => void;
+    const pending = new Promise<{ data: typeof TEST_USER }>((resolve) => { resolveSave = resolve; });
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    vi.spyOn(api, 'patch').mockImplementation(() => pending as any);
+    vi.spyOn(api, 'post').mockResolvedValue({ data: undefined });
+    const user = userEvent.setup(); renderAuthProbe();
+    await screen.findByText('Test User');
+    await user.click(screen.getByRole('button', { name: 'Save profile probe' }));
+    await user.click(screen.getByRole('button', { name: 'Logout probe' }));
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+    resolveSave({ data: { ...TEST_USER, full_name: 'Late Name' } });
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent('CanceledError'));
+    expect(screen.getByTestId('user-email')).toHaveTextContent('none');
   });
 
 });

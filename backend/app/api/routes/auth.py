@@ -3,11 +3,11 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_enabled_user
+from app.api.deps import get_current_active_user, get_current_enabled_user
 from app.core.config import settings
 from app.core.security import (
     clear_auth_cookie,
@@ -18,7 +18,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.user import User as UserModel
-from app.schemas.user import User as UserRead, UserCreate
+from app.schemas.user import User as UserRead, UserCreate, UserProfileUpdate
 from app.schemas.email_verification import EmailVerificationCode, EmailVerificationDelivery
 from app.services.email_verification import confirm_email_code, request_email_code
 
@@ -154,6 +154,39 @@ async def read_users_me(
     current_user: UserModel = Depends(get_current_enabled_user),
 ):
     response.headers["Cache-Control"] = "no-store"
+    return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+async def update_users_me(
+    payload: UserProfileUpdate,
+    response: Response,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    # Compare and update atomically: two tabs cannot silently replace each
+    # other's names. Accept an already-saved target after a lost response.
+    result = await db.execute(
+        update(UserModel)
+        .where(
+            UserModel.id == current_user.id,
+            or_(
+                UserModel.full_name == payload.expected_full_name,
+                UserModel.full_name == payload.full_name,
+            ),
+        )
+        .values(full_name=payload.full_name)
+        .returning(UserModel.id)
+    )
+    if result.scalar_one_or_none() is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your profile changed in another tab. Your edits are kept. Refresh to review the saved profile before trying again.",
+        )
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 

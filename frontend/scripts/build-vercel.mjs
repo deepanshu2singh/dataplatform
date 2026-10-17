@@ -1,8 +1,9 @@
 // Vercel invokes this from the frontend service root. Also works on Windows.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyCloudApiBundle } from '../build/verifyCloudApiBundle.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const override = process.env.VITE_API_URL;
@@ -32,13 +33,10 @@ for (const asset of ['pyodide.mjs', 'pyodide.asm.mjs', 'pyodide.asm.wasm', 'pyth
   if (!existsSync(join(runtime, asset))) throw new Error(`Missing browser runtime asset: ${asset}`);
 }
 if (!existsSync(join(dist, 'python-worker.mjs'))) throw new Error('Missing browser Python worker.');
-// Check the shipped main application bundle, not source maps or test output.
+// Check the shipped bootstrap and its static shared chunks, not source maps.
 const bundle = readdirSync(join(dist, 'assets')).filter((name) => /^index-.*\.js$/.test(name));
 if (bundle.length !== 1) throw new Error('Could not identify the main application bundle.');
-const source = readFileSync(join(dist, 'assets', bundle[0]), 'utf8');
-if (!source.includes('/api/v1') || source.includes('http://localhost:8000/api/v1')) {
-  throw new Error('Built application does not use the required same-origin API.');
-}
+verifyCloudApiBundle(join(dist, 'assets'), bundle[0]);
 console.log('CLOUD_FRONTEND_BUILD=PASS');
 console.log('CLOUD_API_BASE=/api/v1');
 console.log('SELF_HOSTED_PYTHON_ASSETS=PASS');

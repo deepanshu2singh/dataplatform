@@ -115,3 +115,24 @@
  .settings-security-footer { flex-direction:column; }
  .settings-security-footer button { width:100%; min-height:44px; }
 }
+.settings-data { display: grid; gap: 1.25rem; }
+.settings-data-card { border: 1px solid var(--line); border-radius: 16px; padding: clamp(1rem, 2.5vw, 1.5rem); min-width: 0; }
+.settings-data-card h3 { display: flex; align-items: center; gap: .6rem; margin: 0 0 .7rem; font-size: 1rem; }
+.settings-data-card p { line-height: 1.65; }
+.settings-data-note { color: var(--muted); font-size: .82rem; margin-top: .9rem; }
+.settings-data-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1rem; }
+.settings-data-actions .settings-secondary { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
+.settings-data-password { display: flex; gap: .6rem; align-items: center; }
+.settings-data-password input { min-width: 0; flex: 1; }
+.settings-data-card form { display: grid; gap: 1rem; margin-top: 1rem; }
+.settings-data-card form > button { justify-self: start; }
+.settings-data-file-controls { display: grid; gap: .6rem; margin-top: 1rem; }
+.settings-data-file-controls select { width: 100%; min-width: 0; border: 1px solid var(--control-line); border-radius: 10px; padding: .8rem; background: var(--surface); color: var(--foreground); }
+.settings-data-progress { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.settings-data-progress span { flex: 1; min-width: 8rem; }
+.settings-data-privacy dl { display: grid; gap: 1rem; margin: 0; }
+.settings-data-privacy dl > div { display: grid; grid-template-columns: minmax(8rem, 1fr) 3fr; gap: 1rem; }
+.settings-data-privacy dt { font-weight: 650; }
+.settings-data-privacy dd { margin: 0; color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; }
+.settings-data-privacy a { display: inline-flex; align-items: center; gap: .4rem; color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 600px) { .settings-data-privacy dl > div { grid-template-columns: 1fr; gap: .25rem; } .settings-data-actions > button { width: 100%; justify-content: center; } }

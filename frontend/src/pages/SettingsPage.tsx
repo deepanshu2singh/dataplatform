@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../lib/apiError';
 import { isCanceledRequest, useLatestRequest } from '../hooks/useLatestRequest';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChanges';
 import { AccountSecurity } from '../components/AccountSecurity';
+import { AccountData } from '../components/AccountData';
 import './SettingsPage.css';
 
 type SettingsTab = 'profile' | 'appearance' | 'security' | 'notifications' | 'data';
@@ -33,6 +34,7 @@ export function SettingsPage() {
   const [profile, setProfile] = useState({ name: storedName ?? '', originalName: storedName });
   const [busy, setBusy] = useState(false);
   const [securityBusy, setSecurityBusy] = useState(false);
+  const [dataBusy, setDataBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const saveRequest = useLatestRequest();
@@ -68,7 +70,7 @@ export function SettingsPage() {
     }
   };
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (securityBusy) return;
+    if (securityBusy || dataBusy) return;
     let nextIndex = index;
     if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
     else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
@@ -101,7 +103,7 @@ export function SettingsPage() {
           const Icon = tab.icon;
           return <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab"
             aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`}
-            disabled={securityBusy} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)}
+            disabled={securityBusy || dataBusy} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)}
             onKeyDown={(event) => handleTabKeyDown(event, index)}>
             <Icon size={16} aria-hidden="true" />{tab.label}
           </button>;
@@ -148,19 +150,12 @@ export function SettingsPage() {
           </fieldset>
           <p className="settings-appearance-note">Applied immediately and remembered in this browser. The header appearance control uses the same preference.{preference === 'system' && ` Your device is currently using ${resolvedTheme} mode.`}</p>
         </>}
-        <div hidden={activeTab !== 'security'}><AccountSecurity profileBlocked={dirty || busy} onBusyChange={setSecurityBusy} /></div>
+        <div hidden={activeTab !== 'security'}><AccountSecurity profileBlocked={dirty || busy || dataBusy} onBusyChange={setSecurityBusy} /></div>
         {activeTab === 'notifications' && <>
           <div className="settings-section-heading"><h2>Notifications</h2><p>Your optional updates and account messages.</p></div>
           <UnavailableCard title="Notification preferences" description="Optional notification and digest preferences are not available yet. Email verification messages are part of account security." />
         </>}
-        {activeTab === 'data' && <>
-          <div className="settings-section-heading"><h2>Your account data</h2><p>Your datasets, notebooks and dashboards stay in your workspace.</p></div>
-          <div className="settings-unavailable-list">
-            <UnavailableCard title="Retention controls" description="Custom automatic retention policies are not available yet." />
-            <UnavailableCard title="Data export" description="A full account export is not available yet." />
-            <UnavailableCard title="Account deletion" description="Account deletion is not available in Settings yet." />
-          </div>
-        </>}
+        <div hidden={activeTab !== 'data'}><AccountData profileBlocked={dirty || busy || securityBusy} onBusyChange={setDataBusy} /></div>
       </div>
     </section>
     <p className="settings-footnote"><Shield size={14} aria-hidden="true" />Your settings belong to your account. Your theme choice belongs to this browser.</p>

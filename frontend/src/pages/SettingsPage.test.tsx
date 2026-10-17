@@ -257,7 +257,8 @@ describe('connected account settings', () => {
     expect(screen.getByRole('tab', { name: 'Appearance' })).toHaveFocus();
     await user.keyboard('{End}');
     expect(screen.getByRole('tab', { name: 'Data' })).toHaveFocus();
-    expect(screen.getByText('Account deletion')).toBeInTheDocument();
+    expect(screen.getByText('Retention and account deletion')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Prepare workspace export' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /delete account/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Notifications' }));
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();

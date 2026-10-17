@@ -39,6 +39,8 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_response(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith(f"{settings.API_V1_STR}/account-data/"):
+        return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={"detail": "Check the export request and try again."})
     if request.url.path in {f"{settings.API_V1_STR}/auth/password-recovery/request", f"{settings.API_V1_STR}/auth/password-recovery/confirm"}:
         detail = "Enter a valid account email address." if request.url.path.endswith("/request") else "Check your email, eight-digit reset code and new password of 8 to 128 characters."
         return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={"detail": detail})

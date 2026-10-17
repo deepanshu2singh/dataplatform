@@ -1,0 +1,130 @@
+{
+  "phase": "cloud-settings-data",
+  "status": "Windows and reported production acceptance PASS; scoped Git/full checkpoint independent confirmation pending",
+  "baseline_commit": "6eddf32581536b053a981e1604f289992e5ac2a0",
+  "baseline_tree": "aad44c82f6d42e0ceb480ccd6a1499ca1ad6aa98",
+  "baseline_zip": "cloud-password-recovery-accepted-20261017-231542-a39f9c8e.zip",
+  "baseline_sha256": "8a17df5cbb19b0ca8e792ee60458439246a5ce84b475c4074520dafc51e8523e",
+  "operator": "Deepanshu Singh personally",
+  "privacy_contact": "deepanshu1927@outlook.com",
+  "contact_evidence": "Explicit user confirmation; no email sent or mailbox credentials requested",
+  "migration": "NONE; accepted0008 unchanged",
+  "dependencies_environment_provider": "Unchanged; no new key/bucket/DNS or credentials required",
+  "backend": "148focused tests PASS;6new native PostgreSQL cases skipped here and REQUIRED in guarded Windows Docker verifier",
+  "frontend": "Full226tests/36filesPASS after timestamp/completion-label refinements and25items/part cap; small-record pagination/continuation tested",
+  "build": "Final TypeScript/cloud build/API graph/self-hosted Python/sanitizer/brandPASS",
+  "lint": "0errors/9preexisting warnings; no new warnings",
+  "browser": {
+    "kind": "production cloud build with synthetic APIs; not live/native evidence",
+    "results": [
+      {
+        "label": "desktop-light",
+        "width": 1440,
+        "theme": "light",
+        "overflow": false,
+        "download_json": "PASS",
+        "no_secret_storage": "PASS",
+        "page_errors": 0
+      },
+      {
+        "label": "desktop-dark",
+        "width": 1440,
+        "theme": "dark",
+        "overflow": false,
+        "download_json": "PASS",
+        "no_secret_storage": "PASS",
+        "page_errors": 0
+      },
+      {
+        "label": "mobile-light",
+        "width": 390,
+        "theme": "light",
+        "overflow": false,
+        "download_json": "PASS",
+        "no_secret_storage": "PASS",
+        "page_errors": 0
+      },
+      {
+        "label": "mobile-dark",
+        "width": 320,
+        "theme": "dark",
+        "overflow": false,
+        "download_json": "PASS",
+        "no_secret_storage": "PASS",
+        "page_errors": 0
+      }
+    ]
+  },
+  "browser_security": "Sparticuz disable-web-security flag explicitly removed; same-origin unsafe POST Origin verified; synthetic APIs only, not real live/native evidence",
+  "source_guards": "335unchanged tracked source blobs match baseline including all migrations/security/recovery/verification/execution/config/manifests/brand assets",
+  "export_limits": "25catalog entries and25items per JSON part;384KiB raw record fragments;32MiB per-record explicit bound; numbered valid JSON parts target4MiB whole records; no silent truncation; not an atomic whole-DB snapshot",
+  "security": "Current-password durable shared5/15min limit WITHOUT revocation; distinct15min purpose/audience/user/session-version proof plus live cookie/verified-owner checks on every call; strict/no-store/redacted inputs; no persisted credentials",
+  "original_files": "Original private cloud CSV via60second owner-safe signed download; direct browser fetch omits credentials/referrer and rejects redirects; bytes bounded; no Python snapshot substitution",
+  "privacy_scope": "Confirmed contact and accurate current control facts; no invented full legal privacy notice, retention/deletion guarantees or blanket GDPR compliance claim",
+  "windows": {
+    "status": "PASS; user reported final helper marker and cloud/API/Python/brand/input markers",
+    "record": "D:\\New project\\databricks-clone-v1\\checkpoints\\cloud-settings-data-checks-20261018-000427-5705a98a\\RESULTS.json",
+    "final_marker": "WINDOWS_SETTINGS_DATA_CHECKS=PASS",
+    "raw_final_totals": "Not supplied; none inferred"
+  },
+  "live": {
+    "evidence_source": "Actual user console outputs and explicit browser acceptance;18October2026 Europe/London",
+    "deployment": "dataplatform-v1-q3jkjnq4h-deepanshu1927.vercel.app",
+    "inspect": "https://vercel.com/deepanshu1927/dataplatform-v1/4qVvskj2592yGJuni2qMLKbJYcQb",
+    "origin": "https://dataplatform.sprout-sql.com",
+    "database": "Accepted20261017_0008 retained; no Data migration",
+    "health_live": {
+      "http": 200,
+      "status": "alive"
+    },
+    "health_ready": {
+      "http": 200,
+      "status": "ready",
+      "database": "ok",
+      "migrations": "ok"
+    },
+    "export": {
+      "wrong_password_rejected_session_retained": "PASS",
+      "correct_password_accepted_session_retained": "PASS",
+      "all_numbered_parts_through_final": "PASS",
+      "own_profile_and_expected_saved_work_found": "PASS"
+    },
+    "original_csv": {
+      "small_source_bytes": 177,
+      "small_sha256_equality": true,
+      "large_generated_rows": 25000,
+      "large_source_bytes": 4652820,
+      "large_download_bytes": 4652820,
+      "large_sha256_equality": true
+    },
+    "regressions": {
+      "privacy_operator_contact": "PASS",
+      "light_dark_narrow": "PASS",
+      "dataset_preview": "PASS",
+      "notebook_sql_python": "PASS",
+      "dashboard_charts_layout": "PASS",
+      "profile_name_theme": "PASS"
+    },
+    "other_manual_edge_tests": "Not separately reported; automated coverage retained, no invented manual results"
+  },
+  "rollback": "Byte-guarded pre-cloud rollback only; keep0007/0008 security/recovery; no migration/downgrade/cleanup/Git mutation",
+  "guidance": [
+    "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/right-to-data-portability/",
+    "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/the-right-to-be-informed/what-privacy-information-should-we-provide/",
+    "https://vercel.com/docs/functions/limitations"
+  ],
+  "backend_windows": {
+    "initial_full_run": {
+      "passed": 432,
+      "failed": 1,
+      "failure": "test_native_account_data[roundtrip-and-isolation]"
+    },
+    "diagnosis": "Test-only invalid source.csv storage key; application validation correctly rejected it before mocked provider access",
+    "correction": "Native fixture uses existing key generator; three additional valid/malformed/foreign-owner storage-key regression cases",
+    "repair_helper_sha256": "954beac2d5a0feeacc5dc354456eb8444d0958b9eb905ea1eab519dd9091435d",
+    "repair_gate": "Failed native plus three new regression cases must all pass without skips, then frontend/lint/build/brand/source guards; final marker user supplied",
+    "local_corrected_account_data_unit_tests": 34,
+    "no_unnecessary_repetition": "Other432passing backend cases retained under353source guards; no claim of new single full436pass run"
+  },
+  "release": "Pending actual scoped Git publish/full checkpoint independent audit. Closure updates phase docs only; no new application mutation, deployment, migration or test rerun."
+}

@@ -89,6 +89,6 @@ export function AccountSecurity({ profileBlocked, onBusyChange }: { profileBlock
     {error && <p role="alert" className="settings-feedback is-error">{error}</p>}
     <div className="settings-security-footer"><p><ShieldCheck size={15} aria-hidden="true" />Both controls require your current password. Five attempts are allowed per 15 minutes across these controls.</p>
       <button type="button" className="settings-secondary" disabled={!dirty || Boolean(busy)} onClick={clearDraft}>Clear password fields</button></div>
-    <div className="settings-unavailable"><ShieldCheck size={18} aria-hidden="true" /><div><h3>Additional protection</h3><p>A device list, two-factor authentication and forgotten-password recovery are not available yet. Email verification confirms inbox access; it is not two-factor authentication.</p></div></div>
+    <div className="settings-unavailable"><ShieldCheck size={18} aria-hidden="true" /><div><h3>Additional protection</h3><p>Forgotten-password recovery is available from the sign-in screen when you are signed out. A device list and two-factor authentication are not available yet. Email verification confirms inbox access; it is not two-factor authentication.</p></div></div>
   </div>;
 }

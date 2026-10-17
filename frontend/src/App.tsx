@@ -11,6 +11,7 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { Layout } from './components/Layout';
 import { UnsavedChangesProvider } from './components/UnsavedChangesProvider';
 import { LoginPage } from './pages/LoginPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { HomePage } from './pages/HomePage';
 import { BrandedLoadingScreen as FullPageLoading } from './components/BrandedLoadingScreen';
@@ -102,6 +103,11 @@ function ProtectedLayout() {
 }
 
 const router = createBrowserRouter([
+  {
+    path: '/forgot-password',
+    errorElement: <RouteErrorPage />,
+    element: <PublicRoute><UnsavedChangesProvider><ForgotPasswordPage /></UnsavedChangesProvider></PublicRoute>,
+  },
   {
     path: '/verify-email',
     errorElement: <RouteErrorPage />,

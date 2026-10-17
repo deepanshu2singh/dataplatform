@@ -19,6 +19,8 @@ class User(Base):
         ),
         CheckConstraint("session_version >= 0", name="ck_users_session_version"),
         CheckConstraint("security_attempts BETWEEN 0 AND 5", name="ck_users_security_attempts"),
+        CheckConstraint("password_reset_attempts BETWEEN 0 AND 5", name="ck_users_password_reset_attempts"),
+        CheckConstraint("password_reset_window_count BETWEEN 0 AND 5", name="ck_users_password_reset_window_count"),
         CheckConstraint("email_verification_attempts BETWEEN 0 AND 5", name="ck_users_email_verification_attempts"),
         CheckConstraint("email_verification_window_count >= 0", name="ck_users_email_verification_window_count"),
     )
@@ -49,6 +51,14 @@ class User(Base):
     session_version = Column(Integer, nullable=False, default=0, server_default="0")
     security_attempts = Column(Integer, nullable=False, default=0, server_default="0")
     security_window_started_at = Column(DateTime(timezone=True), nullable=True)
+
+    password_reset_nonce = Column(String(32), nullable=True)
+    password_reset_digest = Column(String(64), nullable=True)
+    password_reset_expires_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_last_sent_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    password_reset_window_started_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_window_count = Column(Integer, nullable=False, default=0, server_default="0")
 
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     email_verification_nonce = Column(String(32), nullable=True)

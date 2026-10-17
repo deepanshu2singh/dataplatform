@@ -11,7 +11,7 @@ import asyncpg
 import pytest
 
 APP_TABLES = {"users", "datasets", "notebooks", "dashboards", "dataset_uploads", "email_delivery_limits"}
-HEAD_REVISION = "20261017_0007"
+HEAD_REVISION = "20261017_0008"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 

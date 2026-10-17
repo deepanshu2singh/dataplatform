@@ -23,6 +23,8 @@ from app.schemas.email_verification import EmailVerificationCode, EmailVerificat
 from app.schemas.account_security import PasswordChange, SecurityReauthentication
 from app.services.account_security import secure_account
 from app.services.email_verification import confirm_email_code, request_email_code
+from app.schemas.password_recovery import RecoveryRequest, RecoveryConfirm
+from app.services.password_recovery import request_recovery, confirm_recovery
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -30,6 +32,20 @@ logger = logging.getLogger(__name__)
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+@router.post("/password-recovery/request", status_code=status.HTTP_202_ACCEPTED)
+async def request_password_recovery(payload: RecoveryRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    return await request_recovery(db, normalize_email(str(payload.email)))
+
+
+@router.post("/password-recovery/confirm", status_code=status.HTTP_204_NO_CONTENT)
+async def confirm_password_recovery(payload: RecoveryConfirm, response: Response, db: AsyncSession = Depends(get_db)):
+    await confirm_recovery(db, normalize_email(str(payload.email)), payload.code, payload.new_password)
+    # Database revocation, not an auto-login/cookie deletion that could erase a
+    # newer concurrent login (possibly belonging to a different account).
+    response.headers["Cache-Control"] = "no-store"
 
 
 @router.post(

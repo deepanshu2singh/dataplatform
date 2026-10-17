@@ -39,6 +39,9 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_response(request: Request, exc: RequestValidationError):
+    if request.url.path in {f"{settings.API_V1_STR}/auth/password-recovery/request", f"{settings.API_V1_STR}/auth/password-recovery/confirm"}:
+        detail = "Enter a valid account email address." if request.url.path.endswith("/request") else "Check your email, eight-digit reset code and new password of 8 to 128 characters."
+        return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={"detail": detail})
     if request.url.path == f"{settings.API_V1_STR}/auth/email-verification/confirm":
         # FastAPI's normal validation response can echo the submitted input.
         # A malformed pasted code must not appear in response/error telemetry.

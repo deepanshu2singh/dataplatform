@@ -4,7 +4,7 @@ from app.db.session import Base
 
 
 class EmailDeliveryLimit(Base):
-    """Two bounded, shared counters; never an in-memory serverless limiter."""
+    """Bounded constant-key delivery/anonymous budgets shared across workers."""
 
     __tablename__ = "email_delivery_limits"
     __table_args__ = (CheckConstraint("count >= 0", name="ck_email_delivery_limits_count"),)

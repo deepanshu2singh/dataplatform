@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { RouterProvider, createMemoryRouter } from 'react-router-dom';
+import { Outlet, RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthProvider } from '../contexts/AuthContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider } from '../components/ThemeProvider';
 import { THEME_STORAGE_KEY } from '../contexts/theme';
 import { UnsavedChangesProvider } from '../components/UnsavedChangesProvider';
@@ -16,12 +16,18 @@ let serverUser = { ...original };
 let patch: ReturnType<typeof vi.spyOn>;
 let media: { matches: boolean; addEventListener: ReturnType<typeof vi.fn>; removeEventListener: ReturnType<typeof vi.fn> };
 
+function LoginDestination() {
+  const { securityNotice } = useAuth();
+  return <><div>Login destination</div><p data-testid="completion-reason">{securityNotice}</p></>;
+}
 function renderSettings() {
   const router = createMemoryRouter([
-    { element: <AuthProvider><ThemeProvider><UnsavedChangesProvider><ProtectedRoute><Layout /></ProtectedRoute></UnsavedChangesProvider></ThemeProvider></AuthProvider>, children: [
-      { path: '/settings', element: <SettingsPage /> }, { path: '/', element: <div>Home destination</div> },
+    { element: <AuthProvider><ThemeProvider><UnsavedChangesProvider><Outlet /></UnsavedChangesProvider></ThemeProvider></AuthProvider>, children: [
+      { element: <ProtectedRoute><Layout /></ProtectedRoute>, children: [
+        { path: '/settings', element: <SettingsPage /> }, { path: '/', element: <div>Home destination</div> },
+      ] },
+      { path: '/login', element: <LoginDestination /> },
     ] },
-    { path: '/login', element: <div>Login destination</div> },
   ], { initialEntries: ['/settings'] });
   return { router, ...render(<RouterProvider router={router} />) };
 }
@@ -38,6 +44,109 @@ beforeEach(() => {
   patch = vi.spyOn(api, 'patch').mockImplementation(async (_url, data: unknown) => {
     serverUser = { ...serverUser, full_name: (data as { full_name: string | null }).full_name };
     return { data: { ...serverUser } };
+  });
+});
+
+describe('connected Security settings', () => {
+  async function openSecurity() {
+    const view = await openSettings();
+    await userEvent.click(screen.getByRole('tab', { name: 'Security' }));
+    return view;
+  }
+  function fillChange(current = 'Current-Password-123!', next = 'New-Password-456!', confirm = next) {
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: current } });
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: next } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: confirm } });
+  }
+  it('requires matching, different, valid-length passwords and supports show/hide', async () => {
+    const post = vi.spyOn(api, 'post'); await openSecurity();
+    const button = screen.getByRole('button', { name: 'Change password and sign out' });
+    expect(button).toBeDisabled();
+    fillChange('old', 'short'); expect(button).toBeDisabled();
+    fillChange('Current-Password-123!', 'New-Password-456!', 'Mismatch'); expect(button).toBeDisabled();
+    fillChange('Same-Password-123!', 'Same-Password-123!'); expect(button).toBeDisabled();
+    fillChange(); expect(button).toBeEnabled();
+    expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'password');
+    await userEvent.click(screen.getByRole('button', { name: 'Show new password' }));
+    expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'text');
+    await userEvent.click(screen.getByRole('button', { name: 'Hide new password' }));
+    expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'password');
+    expect(post).not.toHaveBeenCalled();
+  });
+  it('posts the password change once and reaches login without an unsaved warning', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ status: 204 });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { router } = await openSecurity(); fillChange();
+    await userEvent.click(screen.getByRole('button', { name: 'Change password and sign out' }));
+    await screen.findByText('Login destination');
+    expect(router.state.location.pathname).toBe('/login');
+    expect(screen.getByTestId('completion-reason')).toHaveTextContent('password');
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith('/auth/password', { current_password: 'Current-Password-123!', new_password: 'New-Password-456!' }, expect.objectContaining({ signal: expect.any(Object) }));
+    expect(confirm).not.toHaveBeenCalled();
+  });
+  it('signs out everywhere through the real AuthProvider using current password only', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ status: 204 });
+    const { router } = await openSecurity();
+    fireEvent.change(screen.getByLabelText('Confirm your password'), { target: { value: 'Existing-Password-123!' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    await screen.findByText('Login destination');
+    expect(router.state.location.pathname).toBe('/login');
+    expect(screen.getByTestId('completion-reason')).toHaveTextContent('revoke');
+    expect(post).toHaveBeenCalledWith('/auth/sessions/revoke', { current_password: 'Existing-Password-123!' }, expect.objectContaining({ signal: expect.any(Object) }));
+  });
+  it('shows a wrong-password error, clears reauthentication secrets and keeps the session', async () => {
+    vi.spyOn(api, 'post').mockRejectedValue({ response: { status: 400, data: { detail: 'The current password is incorrect.' } } });
+    const { router } = await openSecurity(); fillChange();
+    await userEvent.click(screen.getByRole('button', { name: 'Change password and sign out' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The current password is incorrect.');
+    expect(router.state.location.pathname).toBe('/settings');
+    expect(screen.getByLabelText('Current password')).toHaveValue('');
+    expect(screen.getByLabelText('New password')).toHaveValue('New-Password-456!');
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toMatch(/Current-Password|New-Password/);
+  });
+  it('shows rate-limit errors without claiming a successful change', async () => {
+    vi.spyOn(api, 'post').mockRejectedValue({ response: { status: 429, data: { detail: 'Too many security attempts. Wait before trying again.' } } });
+    const { router } = await openSecurity(); fillChange();
+    await userEvent.click(screen.getByRole('button', { name: 'Change password and sign out' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many security attempts');
+    expect(router.state.location.pathname).toBe('/settings');
+  });
+  it('disables both security actions and Settings tabs while one request is pending', async () => {
+    let resolve!: (value: object) => void;
+    const post = vi.spyOn(api, 'post').mockImplementation(() => new Promise((done) => { resolve = done; }));
+    await openSecurity(); fillChange();
+    await userEvent.click(screen.getByRole('button', { name: 'Change password and sign out' }));
+    expect(screen.getByRole('button', { name: 'Changing password…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Sign out everywhere' })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: 'Profile' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Changing password…' }));
+    expect(post).toHaveBeenCalledTimes(1);
+    await act(async () => resolve({ status: 204 })); await screen.findByText('Login destination');
+  });
+  it('protects security drafts across Settings tabs and before leaving', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { router } = await openSecurity(); fillChange();
+    await userEvent.click(screen.getByRole('tab', { name: 'Appearance' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Security' }));
+    expect(screen.getByLabelText('New password')).toHaveValue('New-Password-456!');
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }));
+    expect(confirm).toHaveBeenCalledWith('You have unsaved security changes. Leave without saving?');
+    expect(router.state.location.pathname).toBe('/settings');
+    await userEvent.click(screen.getByRole('button', { name: 'Clear password fields' }));
+    expect(screen.getByLabelText('New password')).toHaveValue('');
+    await userEvent.click(screen.getByRole('link', { name: 'Home' })); await screen.findByText('Home destination');
+  });
+  it('requires saving or discarding a profile draft before a security sign-out', async () => {
+    await openSettings();
+    fireEvent.change(screen.getByRole('textbox', { name: /Full name/ }), { target: { value: 'Unsaved Name' } });
+    await userEvent.click(screen.getByRole('tab', { name: 'Security' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Save or discard your profile changes');
+    expect(screen.getByLabelText('Current password')).toBeDisabled();
+    await userEvent.click(screen.getByRole('tab', { name: 'Profile' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Security' }));
+    expect(screen.getByLabelText('Current password')).toBeEnabled();
   });
 });
 afterEach(() => { vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme'); });
@@ -153,7 +262,8 @@ describe('connected account settings', () => {
     await user.click(screen.getByRole('tab', { name: 'Notifications' }));
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Security' }));
-    expect(screen.queryByLabelText('Current Password')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Current password')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /enable two.factor/i })).not.toBeInTheDocument();
   });
   it('rejects overlong names before sending the request', async () => {
     await openSettings();

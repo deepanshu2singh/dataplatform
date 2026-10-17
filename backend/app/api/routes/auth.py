@@ -20,6 +20,8 @@ from app.db.session import get_db
 from app.models.user import User as UserModel
 from app.schemas.user import User as UserRead, UserCreate, UserProfileUpdate
 from app.schemas.email_verification import EmailVerificationCode, EmailVerificationDelivery
+from app.schemas.account_security import PasswordChange, SecurityReauthentication
+from app.services.account_security import secure_account
 from app.services.email_verification import confirm_email_code, request_email_code
 
 router = APIRouter()
@@ -134,7 +136,7 @@ async def login(
         )
 
     session_token = create_access_token(
-        data={"sub": user.email},
+        data={"sub": user.email, "sv": user.session_version},
         expires_delta=timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ),
@@ -209,3 +211,34 @@ async def confirm_email_verification(
 ):
     response.headers["Cache-Control"] = "no-store"
     return await confirm_email_code(db, current_user.id, payload.code)
+
+
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: PasswordChange,
+    response: Response,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await secure_account(db, user_id=current_user.id,
+                         expected_version=current_user.session_version,
+                         current_password=payload.current_password,
+                         new_password=payload.new_password)
+    response.headers["Cache-Control"] = "no-store"
+    # Revocation is enforced in the database. Do not send a cookie-deletion
+    # response that could arrive late and erase a newer concurrent login cookie.
+
+
+@router.post("/sessions/revoke", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_sessions(
+    payload: SecurityReauthentication,
+    response: Response,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await secure_account(db, user_id=current_user.id,
+                         expected_version=current_user.session_version,
+                         current_password=payload.current_password)
+    response.headers["Cache-Control"] = "no-store"
+    # Revocation is enforced in the database. Do not send a cookie-deletion
+    # response that could arrive late and erase a newer concurrent login cookie.

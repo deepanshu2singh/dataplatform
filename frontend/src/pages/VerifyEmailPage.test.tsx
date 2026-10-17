@@ -16,7 +16,7 @@ describe('email verification screen', () => {
     vi.restoreAllMocks(); verifyEmail.mockReset(); logout.mockReset(); refreshUser.mockReset();
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 1, email: 'user@example.com', full_name: null, is_active: true, is_superuser: false, email_verified: false, email_verification_required: true },
-      loading: false, login: vi.fn(), register: vi.fn(), logout, verifyEmail, refreshUser, updateProfile: vi.fn(),
+      loading: false, login: vi.fn(), register: vi.fn(), logout, verifyEmail, refreshUser, updateProfile: vi.fn(), secureAccount: vi.fn(), securityNotice: null,
     });
   });
   it('does not send emails automatically on mount or refresh', () => {

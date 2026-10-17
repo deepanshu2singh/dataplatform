@@ -1,0 +1,45 @@
+{
+  "phase": "cloud-settings-security",
+  "status": "Windows/native and live acceptance PASS; scoped release recorded; independent actual checkpoint verification pending",
+  "baseline_commit": "65ca3b95d344104a06236098441ae5f1fd1af779",
+  "baseline_checkpoint": "cloud-settings-profile-accepted-20261017-173608-80423007.zip",
+  "baseline_sha256": "73fd12bb3799fac365c702a696c587c35cda358134c62aeaed2f49ff160ffe4b",
+  "migration": "Source head20261017_0007; prior SQL returned20261016_0006; guarded equivalent SQL instructions; direct resulting SQL result not supplied; new source health migrationsok and live Security PASS",
+  "frontend": "202 tests across33files PASS; focused redirect fix38tests PASS; TypeScript PASS",
+  "backend": "127 focused unit/API/security/config/health/observability/rollout/offline-DDL cases PASS;13 existing email native cases skipped without TEST_DATABASE_URL",
+  "native_database": "PASS: user WINDOWS_SETTINGS_SECURITY_CHECKS=PASS requires full backend/native PostgreSQL migration/API/concurrency suite; no raw Windows counts supplied. Earlier local limitation is recorded in historical backend evidence.",
+  "lint": "0 errors;9 preexisting warnings; no new warnings",
+  "build": "Cloud wrapper PASS; /api/v1 static bootstrap graph PASS; editor DOMPurify/self-hosted Python/brand assets PASS",
+  "browser": "Production cloud build with synthetic API fixtures; Chrome155 headless shell/Playwright;1440light/dark,390light,320dark; both success notices, wrong-password/retry, same-origin allow-listed requests and no credential storage PASS;0pageerrors, no horizontal overflow. Six internal screenshots; all six visually reviewed. Not live/native DB evidence.",
+  "security_semantics": "Atomic row-lock/refresh/version recheck; strict integer sv; missing sv accepted only while DB version0; durable shared5attempt/15min limit; passwords never normalized; no Set-Cookie on success to avoid deleting newer login cookie; frontend shared-state completion notice and cancellation guards",
+  "unchanged": "Dependency manifests/lockfile; DB driver/pool/config; email service/mandatory gate; CSRF/cookie configuration; branding assets; dataset/notebook/dashboard code and production layoutv3; Vercel/Vite/Vitest/Docker configs; existing build wrapper/validator",
+  "windows": "PASS: CLOUD_FRONTEND_BUILD, CLOUD_API_BASE=/api/v1, SELF_HOSTED_PYTHON_ASSETS, CLOUD_BRAND_ASSETS, BUILD_INPUT_FILES_UNCHANGED and WINDOWS_SETTINGS_SECURITY_CHECKS",
+  "live": {
+    "date": "2026-10-17",
+    "timezone": "Europe/London",
+    "deployment": "dataplatform-v1-9gr1cbouj-deepanshu1927.vercel.app",
+    "health_live": 200,
+    "health_ready": 200,
+    "database": "ok",
+    "migrations": "ok",
+    "password_change": "All five user checks PASS: wrong current/no logout, success/login, independent old session rejected, old password rejected, new password/verified",
+    "sign_out_everywhere": "PASS: returns login, independent session rejected on refresh, unchanged password works",
+    "original_account_regressions": "PASS: verification, dataset preview, notebook SQL/Python, dashboard charts/layout, profile name/theme",
+    "manual_live_rate_limit_test": "not claimed; durable limits covered by Windows/native suite"
+  },
+  "rollback": "Pre-cloud local source restore only; production retains migration0007 and version-enforcing backend; old backend/public historical deployment can undermine revocation; prefer fix-forward",
+  "guidance": [
+    "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+    "https://docs.sqlalchemy.org/en/20/orm/queryguide/api.html"
+  ],
+  "release": {
+    "scope_files": 30,
+    "expected_source_files": 331,
+    "parent_commit": "65ca3b95d344104a06236098441ae5f1fd1af779",
+    "title": "Save validated Settings account security",
+    "unrelated_plan": "docs/DataPlatform_Settings_Security_Phase_Plan.md excluded; left untouched",
+    "checkpoint_verification": "pending independent actual ZIP and Git comparison",
+    "helper_actions": "documents, scoped commit/push and complete source checkpoint; no Vercel/database command"
+  }
+}

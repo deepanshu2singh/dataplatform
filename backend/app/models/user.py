@@ -17,6 +17,8 @@ class User(Base):
             "char_length(btrim(hashed_password)) > 0",
             name="ck_users_hashed_password_nonblank",
         ),
+        CheckConstraint("session_version >= 0", name="ck_users_session_version"),
+        CheckConstraint("security_attempts BETWEEN 0 AND 5", name="ck_users_security_attempts"),
         CheckConstraint("email_verification_attempts BETWEEN 0 AND 5", name="ck_users_email_verification_attempts"),
         CheckConstraint("email_verification_window_count >= 0", name="ck_users_email_verification_window_count"),
     )
@@ -43,6 +45,10 @@ class User(Base):
         nullable=False,
     )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")
+    security_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    security_window_started_at = Column(DateTime(timezone=True), nullable=True)
 
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     email_verification_nonce = Column(String(32), nullable=True)

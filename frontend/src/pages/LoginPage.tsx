@@ -11,8 +11,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, securityNotice: action } = useAuth();
   const navigate = useNavigate();
+  const notice = action === 'password' ? 'Your password was changed and existing sessions were signed out. Sign in with your new password.' : action === 'revoke' ? 'Your existing sessions were signed out. Sign in to continue.' : '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +39,7 @@ export function LoginPage() {
           <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">Sign in to your workspace</h1>
         </div>
         
+        {notice && <p role="status" className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 p-3 text-sm text-green-800 dark:text-green-200">{notice}</p>}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div role="alert" aria-live="assertive" className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">

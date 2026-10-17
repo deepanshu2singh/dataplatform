@@ -19,14 +19,18 @@ interface User {
   email_verification_required: boolean;
 }
 
+export type SecurityAction = 'password' | 'revoke';
+
 interface AuthContextType {
   user: User | null;
+  securityNotice: SecurityAction | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, full_name?: string) => Promise<void>;
   logout: () => Promise<void>;
   verifyEmail: (code: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  secureAccount: (action: SecurityAction, currentPassword: string, newPassword: string | undefined, beforeSignOut: () => void) => Promise<void>;
   updateProfile: (fullName: string | null, expectedFullName: string | null) => Promise<User>;
 }
 
@@ -35,6 +39,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [securityNotice, setSecurityNotice] = useState<SecurityAction | null>(null);
   const sessionRequest = useLatestRequest();
 
   const clearSession = useCallback(() => {
@@ -77,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession, fetchUser]);
 
   const login = async (email: string, password: string) => {
+    setSecurityNotice(null);
     const formData = new URLSearchParams();
 
     formData.append('username', email.trim().toLowerCase());
@@ -112,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    setSecurityNotice(null);
     sessionRequest.cancel();
     await api.post('/auth/logout');
     setUser(null);
@@ -147,8 +154,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const secureAccount = async (action: SecurityAction, currentPassword: string, newPassword: string | undefined, beforeSignOut: () => void) => {
+    const request = sessionRequest.begin();
+    try {
+      await api.post(action === 'password' ? '/auth/password' : '/auth/sessions/revoke',
+        action === 'password' ? { current_password: currentPassword, new_password: newPassword } : { current_password: currentPassword },
+        { signal: request.signal });
+      if (!request.isCurrent()) {
+        throw Object.assign(new Error('The session changed before the security response arrived'), { name: 'CanceledError', code: 'ERR_CANCELED' });
+      }
+      setSecurityNotice(action);
+      beforeSignOut();
+      clearSession();
+    } finally {
+      request.finish();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, verifyEmail, refreshUser: fetchUser, updateProfile }}>
+    <AuthContext.Provider value={{ user, securityNotice, loading, login, register, logout, verifyEmail, refreshUser: fetchUser, updateProfile, secureAccount }}>
       {children}
     </AuthContext.Provider>
   );

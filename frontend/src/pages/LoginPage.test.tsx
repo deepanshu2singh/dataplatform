@@ -4,17 +4,19 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginPage } from './LoginPage';
 
-const { loginMock } = vi.hoisted(() => ({
+const { loginMock, notice } = vi.hoisted(() => ({
   loginMock: vi.fn(),
+  notice: { value: undefined as unknown },
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ login: loginMock }),
+  useAuth: () => ({ login: loginMock, securityNotice: notice.value }),
 }));
 
-function renderLogin() {
+function renderLogin(securityAction?: unknown) {
+  notice.value = securityAction;
   return render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[{ pathname: '/login', state: { securityAction } }]}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<div>Home destination</div>} />
@@ -59,4 +61,18 @@ describe('LoginPage', () => {
     ).toHaveTextContent('Incorrect email or password');
     expect(screen.queryByText('Home destination')).not.toBeInTheDocument();
   });
+});
+
+
+it.each([
+  ['password', 'Sign in with your new password.'],
+  ['revoke', 'Your existing sessions were signed out.'],
+])('shows the fixed %s completion notice', (action, text) => {
+  renderLogin(action);
+  expect(screen.getByRole('status')).toHaveTextContent(text);
+});
+it('does not echo arbitrary route-state notice text', () => {
+  renderLogin('PRIVATE_UNTRUSTED_TEXT');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.queryByText('PRIVATE_UNTRUSTED_TEXT')).not.toBeInTheDocument();
 });

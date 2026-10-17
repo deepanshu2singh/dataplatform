@@ -18,6 +18,7 @@ const TEST_USER = {
 function AuthProbe() {
   const auth = useAuth();
   const [error, setError] = useState('');
+  const [completed, setCompleted] = useState(false);
 
   return (
     <div>
@@ -27,6 +28,9 @@ function AuthProbe() {
       <div data-testid="full-name">{auth.user?.full_name ?? 'none'}</div>
       <button onClick={() => void auth.updateProfile('Updated Name', 'Test User').catch((reason: unknown) => setError(String(reason)))}>Save profile probe</button>
       <button onClick={() => void auth.verifyEmail('00001234').catch((reason: unknown) => setError(String(reason)))}>Verify probe</button>
+      <div data-testid="security-completed">{String(completed)}</div>
+      <button onClick={() => void auth.secureAccount('password', 'Current-Password', 'New-Password', () => setCompleted(true)).catch((reason: unknown) => setError(String(reason)))}>Change password probe</button>
+      <button onClick={() => void auth.secureAccount('revoke', 'Current-Password', undefined, () => setCompleted(true)).catch((reason: unknown) => setError(String(reason)))}>Revoke sessions probe</button>
       <div data-testid="error">{error}</div>
       <button
         type="button"
@@ -275,4 +279,49 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('user-email')).toHaveTextContent('none');
   });
 
+});
+
+
+describe('security session changes', () => {
+  beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
+  it('posts allow-listed password fields and ends the local session only after success', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ status: 204 });
+    renderAuthProbe(); await screen.findByText(TEST_USER.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Change password probe' }));
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+    expect(post).toHaveBeenCalledWith('/auth/password', { current_password: 'Current-Password', new_password: 'New-Password' }, expect.objectContaining({ signal: expect.any(Object) }));
+    expect(screen.getByTestId('security-completed')).toHaveTextContent('true');
+    expect(localStorage.length).toBe(0);
+  });
+  it('keeps the authenticated session after an incorrect current password', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    vi.spyOn(api, 'post').mockRejectedValue({ response: { status: 400 } });
+    renderAuthProbe(); await screen.findByText(TEST_USER.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Change password probe' }));
+    await waitFor(() => expect(screen.getByTestId('error')).not.toBeEmptyDOMElement());
+    expect(screen.getByTestId('user-email')).toHaveTextContent(TEST_USER.email);
+    expect(screen.getByTestId('security-completed')).toHaveTextContent('false');
+  });
+  it('posts only current password for sign-out-everywhere', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ status: 204 });
+    renderAuthProbe(); await screen.findByText(TEST_USER.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke sessions probe' }));
+    await waitFor(() => expect(screen.getByTestId('user-email')).toHaveTextContent('none'));
+    expect(post).toHaveBeenCalledWith('/auth/sessions/revoke', { current_password: 'Current-Password' }, expect.objectContaining({ signal: expect.any(Object) }));
+  });
+  it('ignores a late security response after a newer login session wins', async () => {
+    let resolve!: (value: object) => void;
+    const pending = new Promise<object>((done) => { resolve = done; });
+    vi.spyOn(api, 'get').mockResolvedValue({ data: TEST_USER });
+    vi.spyOn(api, 'post').mockImplementation(async (url) => url === '/auth/password' ? pending : { status: 204 });
+    renderAuthProbe(); await screen.findByText(TEST_USER.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Change password probe' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Login probe' }));
+    resolve({ status: 204 });
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent('CanceledError'));
+    expect(screen.getByTestId('user-email')).toHaveTextContent(TEST_USER.email);
+    expect(screen.getByTestId('security-completed')).toHaveTextContent('false');
+  });
 });

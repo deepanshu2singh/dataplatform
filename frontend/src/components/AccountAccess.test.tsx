@@ -8,7 +8,7 @@ vi.mock('../contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 const verified = { id: 1, email: 'user@example.com', full_name: null, is_active: true, is_superuser: false, email_verified: true, email_verification_required: true };
 
 function show(path: string, user: typeof verified | null, loading = false) {
-  vi.mocked(useAuth).mockReturnValue({ user, loading, login: vi.fn(), register: vi.fn(), logout: vi.fn(), verifyEmail: vi.fn(), refreshUser: vi.fn(), updateProfile: vi.fn() });
+  vi.mocked(useAuth).mockReturnValue({ user, loading, login: vi.fn(), register: vi.fn(), logout: vi.fn(), verifyEmail: vi.fn(), refreshUser: vi.fn(), updateProfile: vi.fn(), secureAccount: vi.fn(), securityNotice: null });
   const router = createMemoryRouter([
     { path: '/', element: <ProtectedRoute><p>Workspace content</p></ProtectedRoute> },
     { path: '/login', element: <PublicRoute><p>Login form</p></PublicRoute> },

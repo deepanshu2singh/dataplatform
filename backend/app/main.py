@@ -43,6 +43,9 @@ async def validation_error_response(request: Request, exc: RequestValidationErro
         # FastAPI's normal validation response can echo the submitted input.
         # A malformed pasted code must not appear in response/error telemetry.
         return JSONResponse(status_code=422, content={"detail": "Enter an eight-digit verification code"})
+    if request.url.path in {f"{settings.API_V1_STR}/auth/password", f"{settings.API_V1_STR}/auth/sessions/revoke"}:
+        # Do not echo passwords, submitted extra fields or Pydantic input values.
+        return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={"detail": "Check the required password fields. New passwords must be 8 to 128 characters."})
     return await request_validation_exception_handler(request, exc)
 
 # Middleware ordering matters. Starlette executes the most recently added

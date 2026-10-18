@@ -1,3 +1,4 @@
+import { PrivacyLink } from '../components/PrivacyLink';
 import { ThemeControl } from '../components/ThemeControl';
 import { BrandLogo } from '../components/BrandLogo';
 import { useState } from 'react';
@@ -63,6 +64,7 @@ export function RegisterPage() {
           </h1>
         </div>
 
+        <p className="text-sm text-gray-600 dark:text-gray-300">Data Platform is for people aged 16 and above. Read the privacy notice before creating an account.</p>
         <form
           className="mt-8 space-y-6"
           onSubmit={handleSubmit}
@@ -167,6 +169,7 @@ export function RegisterPage() {
             Sign in
           </Link>
         </p>
+        <p className="text-center text-gray-600 dark:text-gray-300"><PrivacyLink /></p>
       </div>
     </div>
   );

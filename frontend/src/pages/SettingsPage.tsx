@@ -1,3 +1,4 @@
+import { ThemeStorageControl } from '../components/ThemeStorageControl';
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Bell, Check, CheckCircle2, Database, Info, Laptop, LoaderCircle, Mail, Moon, Shield, Sun, SunMoon, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -148,7 +149,8 @@ export function SettingsPage() {
               </label>;
             })}</div>
           </fieldset>
-          <p className="settings-appearance-note">Applied immediately and remembered in this browser. The header appearance control uses the same preference.{preference === 'system' && ` Your device is currently using ${resolvedTheme} mode.`}</p>
+          <div className="settings-theme-storage"><ThemeStorageControl /></div>
+          <p className="settings-appearance-note">Applied immediately. The header appearance control uses the same preference.{preference === 'system' && ` Your device is currently using ${resolvedTheme} mode.`}</p>
         </>}
         <div hidden={activeTab !== 'security'}><AccountSecurity profileBlocked={dirty || busy || dataBusy} onBusyChange={setSecurityBusy} /></div>
         {activeTab === 'notifications' && <>

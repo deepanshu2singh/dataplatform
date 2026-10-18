@@ -1,3 +1,4 @@
+import { PrivacyLink } from '../components/PrivacyLink';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff, KeyRound, LoaderCircle } from 'lucide-react';
@@ -125,6 +126,7 @@ export function ForgotPasswordPage() {
         </>}
       </>}
       <Link to="/login" className="block text-center text-sm text-blue-700 dark:text-blue-300 underline">Back to sign in</Link>
+        <p className="text-center text-gray-600 dark:text-gray-300"><PrivacyLink /></p>
     </section>
   </main>;
 }

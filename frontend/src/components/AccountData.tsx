@@ -1,3 +1,6 @@
+import { PrivacyLink } from './PrivacyLink';
+import { useTheme } from '../contexts/theme';
+import { PRIVACY_EMAIL, PRIVACY_CONTACT_LINK as PRIVACY_LINK } from '../lib/privacy';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Download, FileText, LoaderCircle, Mail, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,8 +11,6 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChanges';
 import { emptyExportCursor, exportCatalog, originalCsv, prepareExportPart, startDownload,
   type ExportAuthorization, type ExportCatalog, type ExportCursor } from '../lib/workspaceExport';
 
-const PRIVACY_EMAIL = 'deepanshu1927@outlook.com';
-const PRIVACY_LINK = `mailto:${PRIVACY_EMAIL}?subject=Data%20Platform%20privacy%20request`;
 interface Props { profileBlocked: boolean; onBusyChange: (busy: boolean) => void }
 
 export function AccountData(props: Props) {
@@ -18,6 +19,7 @@ export function AccountData(props: Props) {
 }
 
 function AccountDataPanel({ profileBlocked, onBusyChange, accountId }: Props & { accountId: number | null }) {
+  const { rememberPreference } = useTheme();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authorization, setAuthorization] = useState<(ExportAuthorization & { expiresAt: number }) | null>(null);
@@ -124,8 +126,8 @@ function AccountDataPanel({ profileBlocked, onBusyChange, accountId }: Props & {
     </section>
     <section className="settings-data-card" aria-labelledby="data-export-title">
       <h3 id="data-export-title"><Download size={19} aria-hidden="true" />Workspace export</h3>
-      <p>Numbered JSON files contain your account details, dataset descriptions and schemas, saved notebooks and outputs, dashboard definitions and upload records. Each part holds up to 25 saved items. Keep every part.</p>
-      <p className="settings-data-note">Original CSVs are downloaded separately below. Saved code is copied without running it. Exported work may contain sensitive information; keep your downloads private.</p>
+      <p>Numbered JSON files contain your account details, dataset descriptions and schemas, saved notebook content, dashboard definitions and upload records. Each part holds up to 25 saved items. Keep every part.</p>
+      <p className="settings-data-note">Original CSVs are downloaded separately below. Saved code is copied without running it. Standard notebook saves omit transient results; older saved content may include outputs. Exported work may contain sensitive information; keep your downloads private.</p>
       <div className="settings-data-actions">
         <button type="button" className="primary-action" disabled={disabled || !usable || Boolean(part && (!downloaded || part.complete))} onClick={() => void prepare()}>{part?.complete ? 'All parts prepared' : cursor.part ? 'Prepare next part' : 'Prepare workspace export'}</button>
         {part && <button type="button" className="settings-secondary" disabled={disabled} onClick={downloadPart}><FileText size={16} aria-hidden="true" />Download part {part.cursor.part}{part.complete ? ' (final)' : ''}</button>}
@@ -153,13 +155,13 @@ function AccountDataPanel({ profileBlocked, onBusyChange, accountId }: Props & {
     {message && <p role="status" className="settings-feedback is-success">{message}</p>}
     <section className="settings-data-card settings-data-privacy" aria-labelledby="data-privacy-title">
       <h3 id="data-privacy-title"><ShieldCheck size={19} aria-hidden="true" />Privacy and available controls</h3>
-      <dl><div><dt>App operator</dt><dd>Deepanshu Singh, operating this personal project.</dd></div>
+      <dl><div><dt>App operator</dt><dd>Deepanshu Singh, operating Data Platform personally from the United Kingdom.</dd></div>
         <div><dt>Privacy requests</dt><dd><a href={PRIVACY_LINK}><Mail size={15} aria-hidden="true" />{PRIVACY_EMAIL}</a></dd></div>
         <div><dt>Cloud services</dt><dd>This cloud app uses Vercel for hosting/API requests, Supabase for account/workspace records and private dataset storage, and Resend for security emails.</dd></div>
         <div><dt>Available today</dt><dd>Update your name, change your password, sign out everywhere, export saved work, and manage individual items from their workspace pages.</dd></div>
-        <div><dt>Browser preference</dt><dd>Your theme choice is remembered in this browser. It is separate from your saved account profile.</dd></div>
+        <div><dt>Browser preference</dt><dd>{rememberPreference ? 'Your appearance choice is remembered in this browser.' : 'New appearance choices are not being saved by this page.'} Manage remembering in Appearance or the privacy notice. Browser preferences are separate from your saved account profile.</dd></div>
         <div><dt>Retention and account deletion</dt><dd>Automatic retention settings and account deletion are not available in Settings yet. Contact the operator about access, correction, deletion or other privacy requests. Sending a request does not itself delete your account.</dd></div></dl>
-      <p className="settings-data-note">The workspace export does not include provider logs or backups. This panel describes current controls; it is not a complete legal privacy notice.</p>
+      <p className="settings-data-note">The workspace export does not include provider logs or backups. This panel describes current controls. <PrivacyLink /></p>
     </section>
   </div>;
 }

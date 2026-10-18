@@ -236,6 +236,7 @@ describe('connected account settings', () => {
   it('connects theme cards to the header control, persists the preference and follows System', async () => {
     const user = userEvent.setup(); const view = await openSettings();
     await user.click(screen.getByRole('tab', { name: 'Appearance' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Remember appearance in this browser' }));
     await user.click(screen.getByRole('radio', { name: /^Dark/ }));
     expect(screen.getByRole('combobox', { name: 'Appearance' })).toHaveValue('dark');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');

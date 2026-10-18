@@ -1,3 +1,4 @@
+import { PrivacyLink } from '../components/PrivacyLink';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BrandLogo } from '../components/BrandLogo';
@@ -97,6 +98,7 @@ export function VerifyEmailPage() {
           </button>
         </form>
         <button type="button" disabled={busy} onClick={() => void signOut()} className="w-full text-sm text-gray-600 dark:text-gray-300 underline">Sign out / use another account</button>
+        <p className="text-center text-gray-600 dark:text-gray-300"><PrivacyLink /></p>
       </section>
     </main>
   );

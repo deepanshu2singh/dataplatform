@@ -1,0 +1,94 @@
+{
+  "phase": "CLOUD_PRIVACY_INFORMATION",
+  "date": "2026-10-18",
+  "status": "WINDOWS_AND_USER_LIVE_ACCEPTED_GIT_CHECKPOINT_PENDING",
+  "baseline_commit": "c3db1b1e413f41b7bb4829645e98c81365bc694c",
+  "baseline_tree": "c5392be3c094eb447f1a3cfe86b61828660e4e28",
+  "database_revision": "20261017_0008",
+  "operator_country_confirmed": "United Kingdom",
+  "scope": {
+    "modified_files": 14,
+    "new_files": 11,
+    "payload_files": 25,
+    "backend_changes": false,
+    "migration_changes": false,
+    "dependency_changes": false,
+    "cloud_changes": false
+  },
+  "actual_local_checks": {
+    "focused_frontend_tests": {
+      "status": "PASS",
+      "files": 15,
+      "tests": 110,
+      "environment": "Linux Node, Vitest/jsdom",
+      "rebuilt_after_temporary_reset": true
+    },
+    "lint": {
+      "status": "PASS",
+      "existing_warnings": true
+    },
+    "production_types_and_cloud_build": "PASS",
+    "api_base": "/api/v1",
+    "self_hosted_python_assets": "PASS",
+    "brand_assets": "PASS",
+    "accepted_source_guard": {
+      "status": "PASS",
+      "files": 353
+    },
+    "unchanged_outside_frozen_scope": "PASS"
+  },
+  "pending_checks": {
+    "local_preparation_powershell": "No native Windows PowerShell available in preparation environment",
+    "browser_visual": "User performed live checks; local browser preview never rendered",
+    "git_publication_and_checkpoint": "Performed only when finalizer runs; independent uploaded-checkpoint audit still pending"
+  },
+  "boundaries": [
+    "No automatic account/upload/code retention jobs added",
+    "No self-service account deletion added",
+    "16+ and upload exclusion are use rules; no age assurance or content scanner added",
+    "Provider agreements/children risk and retention operations require their own follow-up",
+    "Theme forgetting removes only dataplatform-theme; leaves authentication, uploads and other browser data intact"
+  ],
+  "accepted_at_london": "2026-10-19T00:52:22+01:00",
+  "windows_evidence": {
+    "status": "USER_REPORTED_PASS",
+    "marker": "WINDOWS_PRIVACY_INFORMATION_CHECKS=PASS",
+    "record": "D:\\New project\\databricks-clone-v1\\checkpoints\\cloud-privacy-information-checks-20261018-233316-b7f31aec\\RESULTS.json",
+    "markers": [
+      "CLOUD_FRONTEND_BUILD=PASS",
+      "CLOUD_API_BASE=/api/v1",
+      "SELF_HOSTED_PYTHON_ASSETS=PASS",
+      "CLOUD_BRAND_ASSETS=PASS",
+      "BUILD_INPUT_FILES_UNCHANGED=PASS"
+    ],
+    "raw_test_totals": "Not supplied for Windows; not inferred"
+  },
+  "live_evidence": {
+    "source": "User-reported browser/CLI acceptance; no independent browser rendering claimed",
+    "deployment": "dataplatform-v1-4ac6crmnj-deepanshu1927.vercel.app",
+    "browser_origin": "https://dataplatform.sprout-sql.com",
+    "health_live": {
+      "http": 200,
+      "status": "alive"
+    },
+    "health_ready": {
+      "http": 200,
+      "status": "ready",
+      "database": "ok",
+      "migrations": "ok"
+    },
+    "public_notice": "Opens without app sign-in; operator/UK/email correct; current cleanup/deletion limitations shown; Light/Dark/narrow readable",
+    "appearance": "Remember survives reload; forget preserves immediate view; reload follows System; both tabs remain unticked after refresh; Settings control works",
+    "drafts": "Sidebar privacy link opens new tab and preserves unsaved notebook draft",
+    "regressions": "Dataset preview, SQL/Python notebook, dashboard charts/saved layout and Settings Data export controls: user PASS",
+    "export_scope": "Export controls checked in this phase, not a repeated download/CSV byte-equality test",
+    "unverified_account_notice": "Route covered by focused automated tests; not separately reported as a live unverified-account check"
+  },
+  "installer_incident": {
+    "initial_failure": "Windows PowerShell File.Replace null-string argument; preflight passed then first existing-file replacement failed",
+    "correction": "Explicit System.Management.Automation.Language.NullString.Value in apply/rollback; same-volume disposable write probe before app writes",
+    "corrected_package_sha256": "eeb912aefb56d6b05f1306745937af5bce68f60158866f8e9861d2ce726e4da9",
+    "outcome": "Corrected application proceeded to Windows verifier PASS",
+    "old_backups": "Keep; load corrected rollback helper for older backup records"
+  }
+}

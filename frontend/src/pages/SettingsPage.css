@@ -136,3 +136,7 @@
 .settings-data-privacy dd { margin: 0; color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; }
 .settings-data-privacy a { display: inline-flex; align-items: center; gap: .4rem; color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 600px) { .settings-data-privacy dl > div { grid-template-columns: 1fr; gap: .25rem; } .settings-data-actions > button { width: 100%; justify-content: center; } }
+
+.settings-theme-storage { margin-top:22px; padding:18px; border:1px solid var(--line); border-radius:12px; color:var(--foreground); }
+.settings-theme-storage .theme-storage-control > p { color:var(--muted); line-height:1.7; }
+.settings-theme-storage input:focus-visible { outline:2px solid var(--focus); outline-offset:3px; }

@@ -1,0 +1,17 @@
+.privacy-page{min-height:100vh;background:var(--canvas);color:var(--foreground)}
+.privacy-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;max-width:76rem;margin:auto;padding:1.25rem 1.5rem}
+.privacy-header-actions{display:flex;align-items:center;gap:1rem;font-size:.875rem}
+.privacy-main{max-width:62rem;margin:auto;padding:2rem 1.5rem 4rem}
+.privacy-intro{margin-bottom:1.5rem}.privacy-intro h1{font-size:clamp(2rem,5vw,3rem);line-height:1.15;letter-spacing:-.035em;font-weight:700;margin:.5rem 0 1rem}
+.privacy-intro>p:not(.eyebrow),.privacy-version{color:var(--muted)}.privacy-version{margin-top:1rem;font-size:.8125rem}
+.privacy-summary{padding:1.5rem;line-height:1.7}.privacy-summary strong{font-size:1.125rem}.privacy-summary p{margin-top:.6rem}
+.privacy-contents{display:flex;flex-wrap:wrap;gap:.65rem 1.25rem;padding:1.5rem .25rem;font-size:.875rem}
+.privacy-page a{text-underline-offset:.2em}.privacy-contents a,.privacy-article a,.privacy-footer a,.privacy-header-actions>a{text-decoration:underline}
+.privacy-article{padding:clamp(1.25rem,4vw,3rem);overflow-wrap:anywhere}.privacy-article section{scroll-margin-top:1.5rem}.privacy-article section+section{border-top:1px solid var(--line);margin-top:2rem;padding-top:2rem}
+.privacy-article h2{font-size:1.375rem;line-height:1.4;font-weight:650;letter-spacing:-.02em;margin-bottom:1rem}.privacy-article h3{font-size:1rem;font-weight:650;margin-bottom:.5rem}
+.privacy-article p,.privacy-article li,.privacy-provider-list{font-size:.9375rem;line-height:1.8}.privacy-article p+p{margin-top:.85rem}.privacy-article ul{list-style:disc;padding-left:1.3rem;margin:.8rem 0}.privacy-article li+li{margin-top:.65rem}
+.privacy-provider-list>div{margin:.9rem 0}.privacy-provider-list dt{font-weight:650}.privacy-provider-list dd{margin-top:.25rem}
+.privacy-browser-control,.privacy-objection{border:1px solid var(--line);border-radius:.875rem;padding:1.25rem;margin:1rem 0}.privacy-browser-control>.theme-control{margin-bottom:1rem}
+.privacy-footer{display:flex;flex-wrap:wrap;gap:.75rem 1.5rem;justify-content:space-between;padding:1.5rem .25rem 0;font-size:.875rem;overflow-wrap:anywhere}
+.privacy-page :focus-visible{outline:2px solid currentColor;outline-offset:4px}.privacy-skip{position:fixed;left:1rem;top:-8rem;z-index:100;padding:.75rem 1rem;background:var(--surface);border:1px solid currentColor;border-radius:.5rem}.privacy-skip:focus{top:1rem}
+@media(max-width:520px){.privacy-header{flex-direction:column;align-items:stretch;padding:1rem}.privacy-header-actions{justify-content:space-between;gap:.75rem}.privacy-main{padding:1.5rem 1rem 3rem}}

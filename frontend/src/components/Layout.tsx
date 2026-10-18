@@ -1,3 +1,4 @@
+import { PrivacyLink } from './PrivacyLink';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -109,6 +110,7 @@ export function Layout() {
           </nav>
 
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-3 pb-2 text-gray-600 dark:text-gray-300"><PrivacyLink /></div>
             <div className="flex items-center gap-3 px-3 py-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                 <span className="text-sm font-medium text-blue-700 dark:text-blue-300">

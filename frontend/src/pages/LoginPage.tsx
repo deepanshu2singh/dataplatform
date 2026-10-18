@@ -1,3 +1,4 @@
+import { PrivacyLink } from '../components/PrivacyLink';
 import { ThemeControl } from '../components/ThemeControl';
 import { BrandLogo } from '../components/BrandLogo';
 import { useState } from 'react';
@@ -103,6 +104,7 @@ export function LoginPage() {
             Sign up
           </Link>
         </p>
+        <p className="text-center text-gray-600 dark:text-gray-300"><PrivacyLink /></p>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { PrivacyLink } from '../components/PrivacyLink';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
@@ -662,6 +663,7 @@ export function DatasetsPage() {
 
                 <input
                   id="dataset-file"
+                  aria-describedby="dataset-use-help"
                   disabled={uploading || pendingUpload !== null || uploadConfig === null}
                   type="file"
                   accept=".csv,text/csv"
@@ -677,6 +679,7 @@ export function DatasetsPage() {
                 </p>
               </div>
 
+              <p id="dataset-use-help" className="text-sm text-gray-600 dark:text-gray-300">Upload only CSV data you are authorised to use. Do not include sensitive personal records, payment-cardholder details, passwords or access keys. <PrivacyLink /></p>
               {selectedFile && (
                 <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
                   <div className="flex items-center justify-between gap-4">

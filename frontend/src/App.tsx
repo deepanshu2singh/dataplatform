@@ -102,7 +102,10 @@ function ProtectedLayout() {
   );
 }
 
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then((module) => ({ default: module.PrivacyPage })));
+
 const router = createBrowserRouter([
+  { path: '/privacy', errorElement: <RouteErrorPage />, element: <PrivacyPage /> },
   {
     path: '/forgot-password',
     errorElement: <RouteErrorPage />,
